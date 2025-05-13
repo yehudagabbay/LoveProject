@@ -1,0 +1,449 @@
+-- Create the database
+CREATE DATABASE love_game;
+GO
+
+-- Use the database
+USE love_game;
+GO
+
+-- Table: Users
+CREATE TABLE Users (
+    UserID INT IDENTITY(1,1) PRIMARY KEY, -- Unique identifier for each user
+    Nickname NVARCHAR(50) NOT NULL,       -- User's nickname
+    Gender NVARCHAR(10) NOT NULL,         -- User's gender
+    Email NVARCHAR(100) NOT NULL UNIQUE,  -- User's email
+    PasswordHash NVARCHAR(255) NOT NULL,  -- Hashed password
+    Age INT NULL,                         -- User's age (optional)
+    CreationDate DATETIME DEFAULT GETDATE() -- Date the user was created
+);go
+
+-- Table: Categories
+CREATE TABLE Categories (
+    CategoryID INT IDENTITY(1,1) PRIMARY KEY, -- Unique identifier for each category
+    CategoryName NVARCHAR(50) NOT NULL,       -- Name of the category
+    Description NVARCHAR(MAX) NULL            -- Description of the category
+);go
+
+-- Table: Levels
+CREATE TABLE Levels (
+    LevelID INT IDENTITY(1,1) PRIMARY KEY, -- Unique identifier for each level
+    LevelName NVARCHAR(50) NOT NULL,       -- Name of the level (Easy, Medium, Hard)
+    Description NVARCHAR(MAX) NULL         -- Description of the level
+);go
+
+-- Table: Cards
+CREATE TABLE Cards (
+    CardID INT IDENTITY(1,1) PRIMARY KEY, -- Unique identifier for each card
+    CategoryID INT NOT NULL,              -- Foreign key to Categories
+    LevelID INT NOT NULL,                 -- Foreign key to Levels
+    CardDescription NVARCHAR(MAX) NOT NULL, -- Description of the card
+    IsActive BIT DEFAULT 1,               -- Whether the card is active (1 = Active)
+    CONSTRAINT FK_Cards_Categories FOREIGN KEY (CategoryID) REFERENCES Categories(CategoryID),
+    CONSTRAINT FK_Cards_Levels FOREIGN KEY (LevelID) REFERENCES Levels(LevelID)
+);go
+
+-- Table: UserCards
+CREATE TABLE UserCards (
+    UserID INT NOT NULL,                  -- Foreign key to Users
+    CardID INT NOT NULL,                  -- Foreign key to Cards
+    PRIMARY KEY (UserID, CardID),         -- Composite primary key to ensure uniqueness
+    CONSTRAINT FK_UserCards_Users FOREIGN KEY (UserID) REFERENCES Users(UserID),
+    CONSTRAINT FK_UserCards_Cards FOREIGN KEY (CardID) REFERENCES Cards(CardID)
+);
+go
+
+-- יצירת טבלה לשמירת סטטוס של כרטיסים אצל משתמשים
+CREATE TABLE UserCardStatus (
+    ID INT IDENTITY(1,1) PRIMARY KEY,  -- מזהה ייחודי לרשומה
+    UserID INT NOT NULL,                -- מזהה המשתמש
+    CardID INT NOT NULL,                -- מזהה הכרטיס
+    IsCompleted BIT DEFAULT 0,           -- האם הכרטיס סומן כבוצע (0 = לא, 1 = כן)
+    LikeStatus INT DEFAULT 0,            -- רמת האהבה לכרטיס (0 = לא מסומן, 1 = אהוב, 2 = אהוב במיוחד)
+    CONSTRAINT FK_UserCardStatus_Users FOREIGN KEY (UserID) REFERENCES Users(UserID),
+    CONSTRAINT FK_UserCardStatus_Cards FOREIGN KEY (CardID) REFERENCES Cards(CardID)
+);
+
+-- Table: Feedback
+CREATE TABLE Feedback (
+    FeedbackID INT IDENTITY(1,1) PRIMARY KEY, -- Unique identifier for each feedback
+    UserID INT NOT NULL,                      -- Foreign key to Users
+    CardID INT NOT NULL,                      -- Foreign key to Cards
+    Rating INT CHECK (Rating BETWEEN 1 AND 5), -- Rating between 1 and 5
+    Comment NVARCHAR(MAX) NULL,              -- Feedback comment (optional)
+    FeedbackDate DATETIME DEFAULT GETDATE(), -- Date the feedback was given
+    CONSTRAINT FK_Feedback_Users FOREIGN KEY (UserID) REFERENCES Users(UserID),
+    CONSTRAINT FK_Feedback_Cards FOREIGN KEY (CardID) REFERENCES Cards(CardID)
+);go
+
+-- Sample Data: Categories
+INSERT INTO Categories (CategoryName, Description)
+VALUES 
+(N'היכרות', N'שאלות ומשימות להיכרות מעמיקה'),
+(N'כיף', N'משימות כיפיות ומשעשעות'),
+(N'תשוקה', N'משימות שמעמיקות את הקשר הרומנטי והאינטימי');
+
+-- Sample Data: Levels
+INSERT INTO Levels (LevelName, Description)
+VALUES 
+(N'קל', N'משימות פשוטות ומהנות'),
+(N'בינוני', N'משימות עם מעט אתגר להעמקת הקשר'),
+(N'קשה', N'משימות מאתגרות הדורשות פתיחות ואומץ');
+
+-- Sample Data: Users
+INSERT INTO Users (Nickname, Gender, Email, PasswordHash, Age, CreationDate)
+VALUES 
+(N'JohnDoe', N'Male', N'john.doe@example.com', N'hashed_password_001', 34, GETDATE()),
+(N'JaneSmith', N'Female', N'jane.smith@example.com', N'hashed_password_002', 29, GETDATE()),
+(N'DavidBrown', N'Male', N'david.brown@example.com', N'hashed_password_003', 41, GETDATE()),
+(N'SaraConnor', N'Female', N'sara.connor@example.com', N'hashed_password_004', 27, GETDATE()),
+(N'MichaelGreen', N'Male', N'michael.green@example.com', N'hashed_password_005', 36, GETDATE()),
+(N'EmilyClark', N'Female', N'emily.clark@example.com', N'hashed_password_006', 32, GETDATE()),
+(N'AaronMiller', N'Male', N'aaron.miller@example.com', N'hashed_password_007', 38, GETDATE()),
+(N'LindaWhite', N'Female', N'linda.white@example.com', N'hashed_password_008', 26, GETDATE()),
+(N'ChrisEvans', N'Male', N'chris.evans@example.com', N'hashed_password_009', 30, GETDATE()),
+(N'AnnaBell', N'Female', N'anna.bell@example.com', N'hashed_password_010', 28, GETDATE());
+
+ALTER TABLE Users
+ADD SocialProvider NVARCHAR(50) NULL, -- מאיזה שירות המשתמש התחבר (Google, Facebook וכו')
+    SocialID NVARCHAR(255) NULL,      -- מזהה המשתמש אצל ספק הרשת החברתית
+    ProfilePicture NVARCHAR(MAX) NULL; -- כתובת התמונה של המשתמש אם זמינה
+
+
+select * from Users
+
+select * from Levels
+
+select * from Categories
+
+-- הוספת כרטיסים לקטגוריית היכרות
+-- רמה: קל
+INSERT INTO Cards (CategoryID, LevelID, CardDescription, IsActive)
+VALUES 
+(1, 1, N'מה התחביב האהוב עליך?', 1),
+(1, 1, N'ספר/י על החיית מחמד שלך או על חיית מחמד שהיית רוצה', 1),
+(1, 1, N'מה המאכל האהוב עליך?', 1),
+(1, 1, N'איזו מוזיקה אתה אוהב/ת לשמוע?', 1),
+(1, 1, N'מה החלום הגדול שלך?', 1),
+(1, 1, N'מה המקום האהוב עליך בעולם?', 1),
+(1, 1, N'מה הסרט האהוב עליך ולמה?', 1),
+(1, 1, N'איזה ספר השפיע עליך במיוחד?', 1),
+(1, 1, N'מה אתה הכי אוהב בעבודה או בלימודים שלך?', 1),
+(1, 1, N'מה הדבר הראשון שאתה עושה כשאתה קם בבוקר?', 1);
+
+-- רמה: בינוני
+INSERT INTO Cards (CategoryID, LevelID, CardDescription, IsActive)
+VALUES 
+(1, 2, N'ספר/י על חוויה משמעותית שעיצבה את מי שאת/ה היום', 1),
+(1, 2, N'מה הדבר שהכי מפחיד אותך ולמה?', 1),
+(1, 2, N'איזו תכונה היית רוצה לשנות בעצמך?', 1),
+(1, 2, N'מה היה הרגע הכי מביך בחייך?', 1),
+(1, 2, N'ספר/י על היחסים שלך עם המשפחה שלך', 1),
+(1, 2, N'מה הערך החשוב ביותר בחייך?', 1),
+(1, 2, N'איזו החלטה קשה היית צריך/ה לקבל לאחרונה?', 1),
+(1, 2, N'מה היית עושה אם היית יכול/ה לחזור אחורה בזמן?', 1),
+(1, 2, N'איך אתה מתמודד עם כישלון?', 1),
+(1, 2, N'מה הדבר שהכי גורם לך לחייך?', 1);
+
+-- רמה: קשה
+INSERT INTO Cards (CategoryID, LevelID, CardDescription, IsActive)
+VALUES 
+(1, 3, N'מה הטראומה הכי גדולה שחווית בחיים?', 1),
+(1, 3, N'איזה סוד שמעולם לא סיפרת לאף אחד תרצה/י לשתף?', 1),
+(1, 3, N'מה הדבר שהכי מתחרט/ת עליו בחיים?', 1),
+(1, 3, N'ספר/י על הפעם האחרונה שבכית ולמה', 1),
+(1, 3, N'מה הדבר שהכי קשה לך לקבל בעצמך?', 1),
+(1, 3, N'איזה חלק מהעבר שלך היית רוצה לשנות ולמה?', 1),
+(1, 3, N'מה הפחד הכי עמוק שלך?', 1),
+(1, 3, N'מתי הרגשת הכי בודד/ה בחייך?', 1),
+(1, 3, N'איזו בגידה או אכזבה הכי כאבה לך?', 1),
+(1, 3, N'מה הדבר שהכי קשה לך לסלוח עליו?', 1);
+
+-- הוספת כרטיסים לקטגוריית כיף
+-- רמה: קל
+INSERT INTO Cards (CategoryID, LevelID, CardDescription, IsActive)
+VALUES 
+(2, 1, N'שירו ביחד שיר אהוב', 1),
+(2, 1, N'עשו תחרות מבטים - מי שצוחק ראשון מפסיד', 1),
+(2, 1, N'ספרו בדיחה אחד לשני', 1),
+(2, 1, N'רקדו ריקוד מצחיק ביחד', 1),
+(2, 1, N'שחקו משחק אבן נייר ומספריים', 1),
+(2, 1, N'עשו תחרות מי יכול לעשות את הקול הכי מצחיק', 1),
+(2, 1, N'נסו לומר משפט ארוך בלי לנשום', 1),
+(2, 1, N'עשו תחרות מי יכול להחזיק את הנשימה הכי הרבה זמן', 1),
+(2, 1, N'שחקו משחק "אני רואה משהו ש..."', 1),
+(2, 1, N'עשו תחרות מי יכול לגלגל את הלשון', 1);
+
+-- רמה: בינוני
+INSERT INTO Cards (CategoryID, LevelID, CardDescription, IsActive)
+VALUES 
+(2, 2, N'עשו תחרות אכילת מרשמלו בלי ידיים', 1),
+(2, 2, N'נסו לצייר אחד את השני עם עיניים עצומות', 1),
+(2, 2, N'עשו תחרות מי יכול לעשות את הפרצוף הכי מצחיק', 1),
+(2, 2, N'שחקו משחק פנטומימה', 1),
+(2, 2, N'נסו ללמד אחד את השני ריקוד חדש', 1),
+(2, 2, N'עשו תחרות מי יכול לומר את האלפבית הפוך הכי מהר', 1),
+(2, 2, N'נסו לכתוב את השם שלכם עם היד השנייה', 1),
+(2, 2, N'עשו תחרות מי יכול לעמוד על רגל אחת הכי הרבה זמן', 1),
+(2, 2, N'נסו לנחש מה השני מצייר לכם על הגב ', 1),
+(2, 2, N'עשו תחרות מי יכול לומר "היא מוכרת שוקולד בשוק" הכי מהר', 1);
+
+-- רמה: קשה
+INSERT INTO Cards (CategoryID, LevelID, CardDescription, IsActive)
+VALUES 
+(2, 3, N'עשו תחרות "מי יכול לשים הכי הרבה מרשמלו בפה ולומר ״אני אוהב/ת אותך״"', 1),
+(2, 3, N'נסו לעמוד על הראש ביחד', 1),
+(2, 3, N'עשו קריוקי לשיר מביך במיוחד', 1),
+(2, 3, N'התחפשו אחד לשני ועשו חיקוי', 1),
+(2, 3, N'צלמו סרטון טיקטוק מצחיק ביחד', 1),
+(2, 3, N'עשו תחרות ריקודים מצחיקה', 1),
+(2, 3, N'נסו לאכול לימון שלם בלי לעוות את הפנים', 1),
+(2, 3, N'עשו תחרות מי יכול לשתות כוס מים הכי מהר בלי להשתמש בידיים', 1),
+(2, 3, N'נסו לעשות 20 סיבובים ואז ללכת בקו ישר', 1),
+(2, 3, N'עשו תחרות מי יכול לעשות הכי הרבה כפיפות בטן ב-30 שניות', 1);
+
+-- הוספת כרטיסים לקטגוריית תשוקה
+-- רמה: קל
+INSERT INTO Cards (CategoryID, LevelID, CardDescription, IsActive)
+VALUES 
+(3, 1, N'החזיקו ידיים ותסתכלו אחד לשני בעיניים למשך דקה', 1),
+(3, 1, N'תנו אחד לשני עיסוי כתפיים קצר', 1),
+(3, 1, N'ספרו אחד לשני מה אתם הכי אוהבים זה בזו', 1),
+(3, 1, N'תארו את הנשיקה הראשונה שלכם', 1),
+(3, 1, N'חבקו אחד את השני למשך 30 שניות', 1),
+(3, 1, N'לחשו מילה מתוקה באוזן של בן/בת הזוג', 1),
+(3, 1, N'תארו את הדבר הכי סקסי בבן/בת הזוג שלכם', 1),
+(3, 1, N'שרטטו לב על הגב של בן/בת הזוג עם האצבע', 1),
+(3, 1, N'נשקו את היד של בן/בת הזוג', 1),
+(3, 1, N'תנו מחמאה כנה על המראה של בן/בת הזוג', 1);
+
+-- רמה: בינוני
+INSERT INTO Cards (CategoryID, LevelID, CardDescription, IsActive)
+VALUES 
+(3, 2, N'נשקו אחד את השני בצורה רומנטית', 1),
+(3, 2, N'ספרו על פנטזיה רומנטית שיש לכם', 1),
+(3, 2, N'עשו ריקוד איטי ורומנטי ביחד', 1),
+(3, 2, N'האכילו אחד את השני בעיניים עצומות', 1),
+(3, 2, N'תארו את הדייט המושלם מנקודת מבטכם', 1),
+(3, 2, N'עשו משחק תפקידים קצר של פגישה ראשונה', 1),
+(3, 2, N'תארו את הפעם הראשונה שהרגשתם משיכה אחד לשני', 1),
+(3, 2, N'עשו עיסוי גב אחד לשני למשך 5 דקות', 1),
+(3, 2, N'ספרו על חלום ארוטי שחלמתם', 1),
+(3, 2, N'תארו את המקום הכי אקזוטי שהייתם רוצים לעשות בו אהבה', 1);
+
+-- רמה: קשה
+INSERT INTO Cards (CategoryID, LevelID, CardDescription, IsActive)
+VALUES 
+(3, 3, N'ספרו על הפנטזיה המינית הכי נועזת שלכם', 1),
+(3, 3, N'עשו סטריפטיז אחד לשני', 1),
+(3, 3, N'נסו תנוחה חדשה ביחד', 1),
+(3, 3, N'שתפו בפנטזיה מינית שמעולם לא סיפרתם לאף אחד', 1),
+(3, 3, N'תארו בפירוט מה הייתם רוצים לעשות אחד לשני ברגע זה', 1),
+(3, 3, N'שחקו משחק תפקידים ארוטי למשך 5 דקות', 1),
+(3, 3, N'תארו את החוויה המינית הכי טובה שהייתה לכם ביחד', 1),
+(3, 3, N'ספרו על פנטזיה מינית שכוללת מקום ציבורי', 1),
+(3, 3, N'תארו בפירוט איך הייתם רוצים לפתות אחד את השני', 1),
+(3, 3, N'שתפו בפנטזיה מינית שכוללת אביזר או תחפושת', 1);
+
+-- הוספת כרטיסים נוספים לקטגוריית היכרות
+-- רמה: קל
+INSERT INTO Cards (CategoryID, LevelID, CardDescription, IsActive)
+VALUES 
+(1, 1, N'מה הצבע האהוב עליך ולמה?', 1),
+(1, 1, N'אם היית יכול/ה לפגוש כל אדם בעולם, מי זה היה?', 1),
+(1, 1, N'מה המאכל שאת/ה הכי שונא/ת?', 1),
+(1, 1, N'מה התוכנית הטלוויזיונית האהובה עליך?', 1),
+(1, 1, N'אם היית יכול/ה לבחור כל מקצוע בעולם, מה היית בוחר/ת?', 1),
+(1, 1, N'מה הזיכרון הכי טוב שיש לך מבית הספר?', 1),
+(1, 1, N'מה הדבר הראשון שאת/ה עושה כשאת/ה מתעורר/ת בבוקר?', 1),
+(1, 1, N'אם היית יכול/ה לבחור כל יכולת על, מה היית בוחר/ת?', 1),
+(1, 1, N'מה הבילוי האהוב עליך בסוף שבוע?', 1),
+(1, 1, N'מה החג האהוב עליך ולמה?', 1);
+
+-- רמה: בינוני
+INSERT INTO Cards (CategoryID, LevelID, CardDescription, IsActive)
+VALUES 
+(1, 2, N'מה הרגע הכי משמח בחייך עד כה?', 1),
+(1, 2, N'איזה שיעור חיים למדת בדרך הקשה?', 1),
+(1, 2, N'מה הדבר שהכי מרגיז אותך באנשים אחרים?', 1),
+(1, 2, N'אם היית יכול/ה לשנות משהו בעברך, מה זה היה?', 1),
+(1, 2, N'מה המטרה הגדולה ביותר שלך לחמש השנים הקרובות?', 1),
+(1, 2, N'איזו תכונה את/ה הכי מעריך/ה באנשים אחרים?', 1),
+(1, 2, N'מה גורם לך להרגיש הכי בטוח/ה?', 1),
+(1, 2, N'איזה ספר או סרט השפיע עליך בצורה משמעותית ולמה?', 1),
+(1, 2, N'מה הדבר שהכי מפחיד אותך לגבי העתיד?', 1),
+(1, 2, N'איך את/ה מתמודד/ת עם לחץ?', 1);
+
+-- רמה: קשה
+INSERT INTO Cards (CategoryID, LevelID, CardDescription, IsActive)
+VALUES 
+(1, 3, N'מה הרגע הכי קשה שעברת בחיים ואיך התמודדת איתו?', 1),
+(1, 3, N'איזו החלטה קשה היית צריך/ה לקבל ואיך היא השפיעה על חייך?', 1),
+(1, 3, N'מה הדבר שהכי קשה לך לסלוח עליו?', 1),
+(1, 3, N'איזה חלק מהאישיות שלך היית רוצה לשנות ולמה?', 1),
+(1, 3, N'מה הפחד הכי עמוק שלך ומאיפה הוא מגיע?', 1),
+(1, 3, N'איזו אמונה או דעה שינית באופן דרמטי במהלך חייך?', 1),
+(1, 3, N'מה הדבר שהכי מתחרט/ת עליו בחיים ולמה לא שינית אותו?', 1),
+(1, 3, N'איך השפיעו עליך היחסים עם ההורים שלך?', 1),
+(1, 3, N'מה הרגע שבו הרגשת הכי חסר/ת ביטחון?', 1),
+(1, 3, N'איזה סוד או רגש את/ה שומר/ת בפנים ומפחד/ת לחשוף?', 1);
+
+-- הוספת כרטיסים נוספים לקטגוריית כיף
+-- רמה: קל
+INSERT INTO Cards (CategoryID, LevelID, CardDescription, IsActive)
+VALUES 
+(2, 1, N'עשו תחרות מי יכול לעשות את הקול של חיה הכי משכנע', 1),
+(2, 1, N'שחקו משחק "מה השתנה?" - אחד מסתכל על השני, עוצם עיניים, והשני משנה משהו קטן', 1),
+(2, 1, N'נסו לצייר פורטרט אחד של השני בעיניים פקוחות הפעם', 1),
+(2, 1, N'עשו תחרות מי יכול להגיד את האלפבית הכי מהר', 1),
+(2, 1, N'שחקו משחק "המלך אמר" למשך 2 דקות', 1),
+(2, 1, N'עשו תחרות מי יכול לעשות את המבט הכי מצחיק', 1),
+(2, 1, N'נסו לספר סיפור ביחד - כל אחד אומר מילה בתורו', 1),
+(2, 1, N'עשו תחרות מי יכול לשרוק את השיר "יום הולדת שמח" הכי טוב', 1),
+(2, 1, N'שחקו משחק "הרוח נושבת" עם תכונות ותחביבים', 1),
+(2, 1, N'עשו תחרות חיקויים של דמויות מפורסמות', 1);
+
+-- רמה: בינוני
+INSERT INTO Cards (CategoryID, LevelID, CardDescription, IsActive)
+VALUES 
+(2, 2, N'נסו ללמד אחד את השני ריקוד מצחיק שהמצאתם', 1),
+(2, 2, N'עשו תחרות מי יכול לעמוד על רגל אחת ולספור אחורה מ-100 הכי מהר', 1),
+(2, 2, N'שחקו משחק "טלפון שבור" עם משפטים מצחיקים', 1),
+(2, 2, N'נסו לצייר ציור משותף כשכל אחד מחזיק בעיפרון ביחד', 1),
+(2, 2, N'עשו תחרות מי יכול לומר "היא מוכרת פרחים בגינה" בהכי הרבה אינטונציות שונות', 1),
+(2, 2, N'שחקו משחק "20 שאלות" עם נושאים מצחיקים', 1),
+(2, 2, N'נסו לבנות את המגדל הכי גבוה מחפצים שיש לכם בסביבה', 1),
+(2, 2, N'עשו תחרות מי יכול לחקות הכי טוב צלילים של כלי תחבורה', 1),
+(2, 2, N'שחקו משחק "שם, עיר, ארץ" עם קטגוריות מצחיקות', 1),
+(2, 2, N'נסו לכתוב שיר מצחיק ביחד על הדייט שלכם', 1);
+
+-- רמה: קשה
+INSERT INTO Cards (CategoryID, LevelID, CardDescription, IsActive)
+VALUES 
+(2, 3, N'עשו תחרות ריקודים מצחיקה לשיר שתבחרו', 1),
+(2, 3, N'נסו לעשות פירמידה אנושית (בזהירות!)', 1),
+(2, 3, N'עשו סצנה קצרה של תיאטרון אימפרוביזציה', 1),
+(2, 3, N'נסו ללמד אחד את השני קסם פשוט', 1),
+(2, 3, N'עשו תחרות מי יכול לעשות את הפרצוף הכי מצחיק תוך כדי שירת אופרה', 1),
+(2, 3, N'נסו לעשות כוריאוגרפיה מצחיקה לשיר פופולרי', 1),
+(2, 3, N'עשו תחרות "מי צוחק ראשון" תוך כדי קריאת בדיחות גרועות אחד לשני', 1),
+(2, 3, N'נסו לעשות סצנה דרמטית כשאתם מדברים רק במילים של שיר שתבחרו', 1),
+(2, 3, N'עשו תחרות חיקויים של סצנות מסרטים מפורסמים', 1),
+(2, 3, N'נסו לעשות ראיון מצחיק אחד עם השני כאילו אתם מפורסמים', 1);
+
+-- הוספת כרטיסים נוספים לקטגוריית תשוקה
+-- רמה: קל
+INSERT INTO Cards (CategoryID, LevelID, CardDescription, IsActive)
+VALUES 
+(3, 1, N'תארו את הנשיקה הראשונה שלכם מנקודת המבט של הצד השני', 1),
+(3, 1, N'ספרו על הפעם הראשונה שהרגשתם משיכה אחד לשני', 1),
+(3, 1, N'תנו חמש מחמאות כנות אחד לשני', 1),
+(3, 1, N'עשו תחרות מי יכול לתת את העיסוי הכי טוב לכפות הידיים', 1),
+(3, 1, N'ספרו על הדבר הראשון שמשך אתכם אחד לשני', 1),
+(3, 1, N'תארו את בן/בת הזוג שלכם בשלוש מילים רומנטיות', 1),
+(3, 1, N'שתפו ברגע רומנטי מפתיע שחוויתם יחד', 1),
+(3, 1, N'תארו את הריח האהוב עליכם של בן/בת הזוג', 1),
+(3, 1, N'ספרו על הפעם האחרונה שהרגשתם פרפרים בבטן בגלל בן/בת הזוג', 1),
+(3, 1, N'תארו את המגע האהוב עליכם של בן/בת הזוג', 1);
+
+-- רמה: בינוני
+INSERT INTO Cards (CategoryID, LevelID, CardDescription, IsActive)
+VALUES 
+(3, 2, N'תארו את הפנטזיה הרומנטית האידיאלית שלכם', 1),
+(3, 2, N'ספרו על החלק הכי סקסי בגוף של בן/בת הזוג לדעתכם', 1),
+(3, 2, N'שתפו ברגע אינטימי מיוחד שחוויתם יחד', 1),
+(3, 2, N'תארו את הדייט הכי סקסי שהייתם רוצים לקחת את בן/בת הזוג', 1),
+(3, 2, N'ספרו על פנטזיה רומנטית שיש לכם לגבי בן/בת הזוג', 1),
+(3, 2, N'תארו את הבגדים שהכי אוהבים לראות על בן/בת הזוג', 1),
+(3, 2, N'שתפו במחשבה סקסית שעברה לכם בראש לאחרונה על בן/בת הזוג', 1),
+(3, 2, N'תארו את המקום הכי אקזוטי שהייתם רוצים לבלות בו זמן רומנטי', 1),
+(3, 2, N'ספרו על הפעם האחרונה שהרגשתם תשוקה חזקה לבן/בת הזוג', 1),
+(3, 2, N'תארו את הריקוד הסקסי שהייתם רוצים לעשות עבור בן/בת הזוג', 1);
+
+-- רמה: קשה
+INSERT INTO Cards (CategoryID, LevelID, CardDescription, IsActive)
+VALUES 
+(3, 3, N'תארו בפירוט את הפנטזיה המינית הכי נועזת שלכם', 1),
+(3, 3, N'ספרו על מקום ציבורי שהייתם רוצים לקיים בו יחסי מין', 1),
+(3, 3, N'תארו את החוויה המינית הכי מרגשת שחוויתם יחד', 1),
+(3, 3, N'שתפו בפנטזיה מינית שכוללת משחק תפקידים', 1),
+(3, 3, N'תארו את הפוזיציה המינית האהובה עליכם ולמה', 1),
+(3, 3, N'ספרו על פנטזיה מינית שכוללת מיקום אקזוטי', 1),
+(3, 3, N'תארו את האביזר המיני שהכי הייתם רוצים לנסות', 1),
+(3, 3, N'שתפו במשחק מקדים שתמיד רציתם לנסות', 1),
+(3, 3, N'תארו את הפנטזיה המינית שלכם שכוללת אדם שלישי', 1),
+(3, 3, N'ספרו על הרגע הכי סקסי שחוויתם יחד עד כה', 1);
+
+SELECT c.CardID, cat.CategoryName, l.LevelName, c.CardDescription
+FROM Cards c
+JOIN Categories cat ON c.CategoryID = cat.CategoryID
+JOIN Levels l ON c.LevelID = l.LevelID
+ORDER BY cat.CategoryName, l.LevelName;
+go
+
+-- Insert feedback for 9 cards, one for each combination of category and level
+INSERT INTO Feedback (UserID, CardID, Rating, Comment, FeedbackDate)
+VALUES 
+(1, 1, 5, N'כרטיס נהדר, עזר לנו להכיר טוב יותר!', GETDATE()),  -- Introduction, Easy
+(2, 6, 4, N'היה כיף מאוד, אבל קצת קל מדי', GETDATE()),         -- Introduction, Medium
+(3, 11, 3, N'קשה מדי, אבל מעניין!', GETDATE()),              -- Introduction, Hard
+(4, 16, 5, N'צחקנו מלא, פשוט נהדר!', GETDATE()),             -- Fun, Easy
+(5, 21, 4, N'היה מאתגר וכיף מאוד!', GETDATE()),              -- Fun, Medium
+(6, 26, 2, N'המשימה לא התאימה לנו בכלל', GETDATE()),         -- Fun, Hard
+(7, 31, 5, N'חווינו רגע מאוד רומנטי, תודה!', GETDATE()),      -- Passion, Easy
+(8, 36, 4, N'היה מיוחד מאוד, ממליץ!', GETDATE()),            -- Passion, Medium
+(9, 41, 3, N'יותר מדי נועז עבורנו, אבל ייחודי', GETDATE());  -- Passion, Hard
+
+go
+SELECT 
+    f.FeedbackID,
+    c.CardDescription,
+    cat.CategoryName,
+    l.LevelName,
+    f.Rating,
+    f.Comment,
+    f.FeedbackDate,
+    u.Nickname AS UserNickname
+FROM 
+    Feedback f
+    INNER JOIN Cards c ON f.CardID = c.CardID
+    INNER JOIN Categories cat ON c.CategoryID = cat.CategoryID
+    INNER JOIN Levels l ON c.LevelID = l.LevelID
+    INNER JOIN Users u ON f.UserID = u.UserID
+ORDER BY 
+    f.FeedbackID;
+	go
+
+	-- Insert sample data into UserCards
+INSERT INTO UserCards (UserID, CardID)
+VALUES 
+(1, 1),  -- User 1 liked Card 1
+(1, 2),  -- User 1 liked Card 2
+(2, 3),  -- User 2 liked Card 3
+(3, 4),  -- User 3 liked Card 4
+(4, 5),  -- User 4 liked Card 5
+(5, 6),  -- User 5 liked Card 6
+(6, 7),  -- User 6 liked Card 7
+(7, 8),  -- User 7 liked Card 8
+(8, 9),  -- User 8 liked Card 9
+(9, 10); -- User 9 liked Card 10
+go
+
+-- Display UserCards with detailed information
+SELECT 
+    u.Nickname AS UserName,
+    c.CardDescription AS CardDetails,
+    cat.CategoryName AS Category,
+    l.LevelName AS Level
+FROM 
+    UserCards uc
+JOIN 
+    Users u ON uc.UserID = u.UserID
+JOIN 
+    Cards c ON uc.CardID = c.CardID
+JOIN 
+    Categories cat ON c.CategoryID = cat.CategoryID
+JOIN 
+    Levels l ON c.LevelID = l.LevelID
+ORDER BY 
+    u.Nickname, cat.CategoryName, l.LevelName;
+go

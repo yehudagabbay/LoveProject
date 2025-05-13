@@ -20,16 +20,16 @@ const Registration = ({ navigation }) => {
     //   alert('סיסמאות לא תואמות!');
     //   return;
     // }
-  
+
     return registerUser();
   }
-  
+
   const registerUser = async () => {
     if (password !== confirmPassword) {
       alert('סיסמאות לא תואמות!');
       return;
     }
-  
+
     const userData = {
       nickname: nickname,
       gender: gender,
@@ -37,119 +37,99 @@ const Registration = ({ navigation }) => {
       passwordHash: password,
       age: parseInt(age)
     };
-    
+
+    console.log('שולח בקשה לשרת...', JSON.stringify(userData));
     try {
-      console.log("נתוני משתמש:", userData);
-      // עדכון כתובת ה-URL והוספת הגדרות נוספות
-      const response = await fetch('https://yehudagabbay.bsite.net/api/Users/register', {
+      const response = await fetch('http://loveGame.somee.com/api/Users/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
-        body: JSON.stringify(userData)
+        body: JSON.stringify(userData),
       });
+      console.log('סטטוס תגובה:', response.status);
+      console.log('תוכן תגובה:', await response.text());
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+        throw new Error(`שגיאה: ${response.status}`);
       }
       const data = await response.json();
-      console.log("תוכן התשובה:", data);
-      
-      // אם הרישום הצליח
       alert('הרישום הצליח!');
       navigation.navigate('Login');
-      
-      return data;
     } catch (error) {
-      console.error("שגיאה ברישום:", error);
+      console.error('שגיאה מלאה:', error.message);
       alert(`שגיאה ברישום: ${error.message}`);
     }
-};
+  };
 
 
-  // const testConnection = async () => {
-  //   try {
-  //     console.log("מתחיל בדיקת חיבור...");
-  //     const response = await fetch("http://192.168.1.197:7279/api/Users");
-  //     console.log("סטטוס התגובה:", response.status);
-  //     const text = await response.text();
-  //     console.log("תוכן התגובה:", text);
-  //   } catch (error) {
-  //     console.error("שגיאת חיבור:", error);
-  //     console.error("סוג השגיאה:", typeof error);
-  //     console.error("הודעת השגיאה:", error.message);
-  //     if (error.cause) {
-  //       console.error("סיבת השגיאה:", error.cause);
-  //     }
-  //   }
-  // };
-  
+
+
 
   return (
-    <ImageBackground 
+    <ImageBackground
       source={require('../../assets/images/reg_page_bg.jpg')} // שים כאן את תמונת הרקע שלך
       style={styles.background}
     >
       <View style={styles.container}>
         <Text style={styles.title}>רישום</Text>
 
-        <TextInput 
-          label="כינוי"  mode="outlined" dense  value={nickname}    onChangeText={setNickname}    style={styles.input}
+        <TextInput
+          label="כינוי" mode="outlined" dense value={nickname} onChangeText={setNickname} style={styles.input}
         />
 
         <Text style={styles.label}>מין:</Text>
         <View style={styles.genderContainer}>
-          <TouchableOpacity 
-            style={[styles.radioButton, gender === 'זכר' && styles.selectedRadio]}   onPress={() => setGender('זכר')}
+          <TouchableOpacity
+            style={[styles.radioButton, gender === 'זכר' && styles.selectedRadio]} onPress={() => setGender('זכר')}
           >
             <Text style={styles.radioText}>זכר</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={[styles.radioButton, gender === 'נקבה' && styles.selectedRadioRed]}  onPress={() => setGender('נקבה')}
+          <TouchableOpacity
+            style={[styles.radioButton, gender === 'נקבה' && styles.selectedRadioRed]} onPress={() => setGender('נקבה')}
           >
             <Text style={styles.radioText}>נקבה</Text>
           </TouchableOpacity>
         </View>
 
-        <TextInput 
-          label="אימייל"  
+        <TextInput
+          label="אימייל"
           mode="outlined"
           dense
-          keyboardType="email-address"   
-          value={email}   
-          onChangeText={setEmail}  
+          keyboardType="email-address"
+          value={email}
+          onChangeText={setEmail}
           style={styles.input}
         />
 
-        <TextInput 
-          label="סיסמה"  
+        <TextInput
+          label="סיסמה"
           mode="outlined"
           dense
-          secureTextEntry  
-          value={password}  
-          onChangeText={setPassword}  
+          secureTextEntry
+          value={password}
+          onChangeText={setPassword}
           style={styles.input}
         />
 
-        <TextInput 
-          label="חזור על הסיסמה"  
+        <TextInput
+          label="חזור על הסיסמה"
           mode="outlined"
           dense
-          secureTextEntry  
-          value={confirmPassword}  
-          onChangeText={setConfirmPassword}  
+          secureTextEntry
+          value={confirmPassword}
+          onChangeText={setConfirmPassword}
           style={styles.input}
         />
 
-        <TextInput 
-          label="גיל"  
+        <TextInput
+          label="גיל"
           mode="outlined"
           dense
-          keyboardType="numeric"  
-          value={age}  
-          onChangeText={setAge}  
+          keyboardType="numeric"
+          value={age}
+          onChangeText={setAge}
           style={styles.input}
         />
 
