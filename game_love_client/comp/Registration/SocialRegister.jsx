@@ -2,18 +2,18 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Alert, TextInput, TouchableOpacity } from 'react-native';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
+import googleAuthConfig from '../../assets/utils/authConfig'
 
 WebBrowser.maybeCompleteAuthSession();
 
 const SocialRegister = ({ route, navigation }) => {
   const provider = route?.params?.provider || 'Google';
+  
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    ...googleAuthConfig,
+    useProxy: true,
+  });
 
-const [request, response, promptAsync] = Google.useAuthRequest({
-  expoClientId: '302885477032-j4u1a9te7f7r6d0mktheeh09l6ltm6hf.apps.googleusercontent.com',
-  androidClientId: '302885477032-k8k7v1vfvj40iq18nbeonp1mfh4jgkju.apps.googleusercontent.com',
-  iosClientId: '302885477032-k6mj16lvhgec0h9ug8klllcvrn11t8ku.apps.googleusercontent.com',
-  useProxy: true,
-});
 
 
 
