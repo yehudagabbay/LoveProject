@@ -11,7 +11,9 @@ WebBrowser.maybeCompleteAuthSession();
 export default function SocialRegister() {
   const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
     expoClientId: '302885477032-n51csr8l7jtvnt0gf4jugju58nee2689.apps.googleusercontent.com',
-  
+    androidClientId:
+      '302885477032-n51csr8l7jtvnt0gf4jugju58nee2689.apps.googleusercontent.com',
+
   });
 
   React.useEffect(() => {
