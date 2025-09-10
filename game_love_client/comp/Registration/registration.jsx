@@ -1,4 +1,12 @@
-// עדכון: שתי אנימציות נפרדות עבור שדות הרשמה וכפתורי רשת חברתית
+// Registration.jsx
+// ------------------------------------------------------------
+// מסך רישום עם:
+// 1) ולידציה אחת (validate) — משמשת גם לשדה בודד וגם לכל הטופס.
+// 2) שליחה לשרת שלך: POST /api/users (UsersController.CreateUser).
+//    שולחים את הסיסמה בשדה PasswordHash — בצד השרת אתה קורא user.HashPassword().
+// 3) הערות ברורות + מצב טעינה.
+// ------------------------------------------------------------
+
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
@@ -7,105 +15,151 @@ import {
   ImageBackground,
   StyleSheet,
   Animated,
-  ScrollView
+  ScrollView,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { TextInput, Button } from 'react-native-paper';
 
+// === עדכן את הכתובת לפי סביבת הריצה ===
+// אמולטור אנדרואיד:  http://10.0.2.2:7279/api
+// מכשיר אמיתי:       http://<IP-של-המחשב>:7279/api
+// Expo Web:           http://localhost:7279/api
+const API_BASE = 'http://loveGame.somee.com/api';
+
 const Registration = ({ navigation }) => {
+  // שדות הטופס
   const [nickname, setNickname] = useState('');
-  const [gender, setGender] = useState('');
-  const [email, setEmail] = useState('');
+  const [gender, setGender]     = useState('');
+  const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [age, setAge] = useState('');
+  const [age, setAge]           = useState('');
+  // סטייט לשגיאות + טעינה
   const [errors, setErrors] = useState({});
+  const [busy, setBusy]     = useState(false);
 
+  // אנימציות קיימות
   const detailsAnim = useRef(new Animated.Value(0)).current;
-  const socialAnim = useRef(new Animated.Value(0)).current;
+  const socialAnim  = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (gender) {
       Animated.parallel([
-        Animated.timing(detailsAnim, {
-          toValue: 1,
-          duration: 700,
-          useNativeDriver: false,
-        }),
-        Animated.timing(socialAnim, {
-          toValue: 1,
-          duration: 700,
-          useNativeDriver: false,
-        })
+        Animated.timing(detailsAnim, { toValue: 1, duration: 700, useNativeDriver: false }),
+        Animated.timing(socialAnim,  { toValue: 1, duration: 700, useNativeDriver: false }),
       ]).start();
     } else {
       Animated.parallel([
-        Animated.timing(detailsAnim, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: false,
-        }),
-        Animated.timing(socialAnim, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: false,
-        })
+        Animated.timing(detailsAnim, { toValue: 0, duration: 300, useNativeDriver: false }),
+        Animated.timing(socialAnim,  { toValue: 0, duration: 300, useNativeDriver: false }),
       ]).start();
     }
   }, [gender]);
 
-  const animatedHeight = detailsAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 325]
-  });
+  const animatedHeight = detailsAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 325] });
+  const animatedSocialTranslate = socialAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 0] });
 
-  const animatedSocialTranslate = socialAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 0]
-  });
+  // ------------------------------------------------------------
+  // ולידציה אחת: אם שולחים field+value → בודק רק אותו שדה ומעדכן errors.
+  // אם לא שולחים כלום → בודק את כל הטופס ומחזיר true/false.
+  // ------------------------------------------------------------
+  const validate = (field, value) => {
+    // כללי עזר
+    const emailRegex    = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d).{6,}$/;
 
-  const validateField = (field, value) => {
-    const newErrors = { ...errors };
-    if (field === 'nickname' && !value.trim()) {
-      newErrors.nickname = 'יש להזין כינוי';
-    } else if (field === 'email') {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!value.trim()) {
-        newErrors.email = 'יש להזין אימייל';
-      } else if (!emailRegex.test(value)) {
-        newErrors.email = 'אימייל לא תקין';
-      } else {
-        delete newErrors.email;
-      }
-    } else if (field === 'password') {
-      const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d).{6,}$/;
-      if (!value) {
-        newErrors.password = 'יש להזין סיסמה';
-      } else if (!passwordRegex.test(value)) {
-        newErrors.password = 'סיסמה צריכה להכיל לפחות 6 תווים, אות ומספר';
-      } else {
-        delete newErrors.password;
-      }
-      if (confirmPassword && value !== confirmPassword) {
-        newErrors.confirmPassword = 'הסיסמאות לא תואמות';
-      } else {
-        delete newErrors.confirmPassword;
-      }
-    } else if (field === 'confirmPassword') {
-      if (value !== password) {
-        newErrors.confirmPassword = 'הסיסמאות לא תואמות';
-      } else {
-        delete newErrors.confirmPassword;
-      }
-    } else if (field === 'age' && (!value || isNaN(value))) {
-      newErrors.age = 'יש להזין גיל חוקי';
-    } else {
-      delete newErrors[field];
+    // נשתמש ב-snapshot של הערכים העדכניים
+    const model = {
+      nickname,
+      gender,
+      email,
+      password,
+      confirmPassword,
+      age,
+      ...(field ? { [field]: value } : {}), // אם הגיעה ערך זמני (onChange), נכניס אותו לחישוב
+    };
+
+    // פונקציה שמייצרת אובייקט שגיאות מלא לפי המודל הנתון
+    const buildErrors = (m) => {
+      const e = {};
+
+      if (!m.nickname?.trim()) e.nickname = 'יש להזין כינוי';
+      if (!m.gender)           e.gender   = 'יש לבחור מין';
+
+      if (!m.email?.trim()) e.email = 'יש להזין אימייל';
+      else if (!emailRegex.test(m.email)) e.email = 'אימייל לא תקין';
+
+      if (!m.password) e.password = 'יש להזין סיסמה';
+      else if (!passwordRegex.test(m.password)) e.password = 'סיסמה צריכה להכיל לפחות 6 תווים, אות ומספר';
+
+      if (m.confirmPassword !== m.password) e.confirmPassword = 'הסיסמאות לא תואמות';
+
+      const n = Number(m.age);
+      if (!m.age || Number.isNaN(n) || n <= 0) e.age = 'יש להזין גיל חוקי';
+
+      return e;
+    };
+
+    if (field) {
+      // מצב של onChange בשדה בודד: בונים errors מלאים אבל נעדכן סטייט רק אם יש שינוי אמיתי
+      const nextErrors = buildErrors(model);
+      setErrors(nextErrors);
+      // אין צורך ב-return כאן
+      return;
     }
-    setErrors(newErrors);
+
+    // מצב של בדיקת-כול (בלחיצה על "הירשם")
+    const allErrors = buildErrors(model);
+    setErrors(allErrors);
+    return Object.keys(allErrors).length === 0;
   };
 
-  const registerUser = () => {
-    alert('נרשמת בהצלחה!');
+  // ------------------------------------------------------------
+  // שליחה לשרת: POST /api/users  (UsersController.CreateUser)
+  // שולחים: nickname, gender, email, passwordHash (הסיסמה הגולמית), age
+  // בצד השרת: user.HashPassword() יצפין וישמור.
+  // ------------------------------------------------------------
+  const registerUser = async () => {
+    // בדיקת-כול עם אותה ולידציה
+    const ok = validate(); // בלי פרמטרים → בודק את כל הטופס
+    if (!ok) return;
+
+    setBusy(true);
+    try {
+      const payload = {
+        nickname: nickname.trim(),
+        gender,
+        email: email.trim(),
+        passwordHash: password,   // ← חשוב! בצד השרת תקרא HashPassword()
+        age: Number(age),
+      };
+
+      const res = await fetch(`${API_BASE}/users/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.status === 201) {
+        Alert.alert('הצלחה', 'נרשמת בהצלחה!');
+        navigation.navigate('Login', { email: email.trim() });
+        return;
+      }
+
+      if (res.status === 400) {
+        const txt = await res.text().catch(() => '');
+        Alert.alert('שגיאה', txt || 'האימייל כבר קיים במערכת');
+        return;
+      }
+
+      const txt = await res.text().catch(() => '');
+      Alert.alert('שגיאה', txt || `שגיאה ברישום (HTTP ${res.status})`);
+    } catch (err) {
+      Alert.alert('תקלה ברשת', err?.message || String(err));
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -121,19 +175,17 @@ const Registration = ({ navigation }) => {
           mode="outlined"
           dense
           value={nickname}
-          onChangeText={(text) => {
-            setNickname(text);
-            validateField('nickname', text);
-          }}
+          onChangeText={(text) => { setNickname(text); validate('nickname', text); }}
           error={!!errors.nickname}
           style={styles.input}
         />
         {errors.nickname && <Text style={styles.errorText}>{errors.nickname}</Text>}
 
         <Text style={styles.label}>מין:</Text>
+        {errors.gender ? <Text style={[styles.errorText, { alignSelf: 'flex-start' }]}>{errors.gender}</Text> : null}
         <View style={styles.genderContainer}>
           <TouchableOpacity
-            onPress={() => setGender('זכר')}
+            onPress={() => { setGender('זכר'); validate('gender', 'זכר'); }}
             style={[styles.genderButton, gender === 'זכר' && styles.genderButtonSelected]}
           >
             <Text style={styles.genderEmoji}>👦🏻</Text>
@@ -141,7 +193,7 @@ const Registration = ({ navigation }) => {
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={() => setGender('נקבה')}
+            onPress={() => { setGender('נקבה'); validate('gender', 'נקבה'); }}
             style={[styles.genderButton, gender === 'נקבה' && styles.genderButtonSelected]}
           >
             <Text style={styles.genderEmoji}>👧🏻</Text>
@@ -151,21 +203,90 @@ const Registration = ({ navigation }) => {
 
         <Animated.View style={{ overflow: 'hidden', height: animatedHeight }}>
           <View style={styles.expandedBlock}>
-            <TextInput label="אימייל" mode="outlined" dense keyboardType="email-address" value={email} onChangeText={(text) => { setEmail(text); validateField('email', text); }} error={!!errors.email} style={styles.input} />
+            <TextInput
+              label="אימייל"
+              mode="outlined"
+              dense
+              keyboardType="email-address"
+              autoCapitalize="none"
+              value={email}
+              onChangeText={(text) => { setEmail(text); validate('email', text); }}
+              error={!!errors.email}
+              style={styles.input}
+            />
             {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
-            <TextInput label="סיסמה" mode="outlined" dense secureTextEntry value={password} onChangeText={(text) => { setPassword(text); validateField('password', text); }} error={!!errors.password} style={styles.input} />
+
+            <TextInput
+              label="סיסמה"
+              mode="outlined"
+              dense
+              secureTextEntry
+              value={password}
+              onChangeText={(text) => { setPassword(text); validate('password', text); }}
+              error={!!errors.password}
+              style={styles.input}
+            />
             {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
-            <TextInput label="חזור על הסיסמה" mode="outlined" dense secureTextEntry value={confirmPassword} onChangeText={(text) => { setConfirmPassword(text); validateField('confirmPassword', text); }} error={!!errors.confirmPassword} style={styles.input} />
+
+            <TextInput
+              label="חזור על הסיסמה"
+              mode="outlined"
+              dense
+              secureTextEntry
+              value={confirmPassword}
+              onChangeText={(text) => { setConfirmPassword(text); validate('confirmPassword', text); }}
+              error={!!errors.confirmPassword}
+              style={styles.input}
+            />
             {errors.confirmPassword && <Text style={styles.errorText}>{errors.confirmPassword}</Text>}
-            <TextInput label="גיל" mode="outlined" dense keyboardType="numeric" value={age} onChangeText={(text) => { setAge(text); validateField('age', text); }} error={!!errors.age} style={styles.input} />
+
+            <TextInput
+              label="גיל"
+              mode="outlined"
+              dense
+              keyboardType="numeric"
+              value={age}
+              onChangeText={(text) => { setAge(text); validate('age', text); }}
+              error={!!errors.age}
+              style={styles.input}
+            />
             {errors.age && <Text style={styles.errorText}>{errors.age}</Text>}
-            <Button mode="contained" icon="heart" onPress={registerUser} buttonColor="#e91e63" textColor="white" style={styles.heartButton}> הירשם </Button>
+
+            <Button
+              mode="contained"
+              icon="heart"
+              onPress={registerUser}
+              disabled={busy}
+              buttonColor="#e91e63"
+              textColor="white"
+              style={[styles.heartButton, { width: 300 }]}
+            >
+              {busy ? 'שולח...' : ' הירשם '}
+            </Button>
+
+            {busy ? <View style={{ marginTop: 10 }}><ActivityIndicator /></View> : null}
           </View>
         </Animated.View>
 
         <Animated.View style={{ transform: [{ translateY: animatedSocialTranslate }] }}>
-          <Button mode="outlined" icon="google" textColor="#DB4437" onPress={() => navigation.navigate('SocialRegister', { provider: 'Google' })} style={styles.socialButton}> הירשם עם Google </Button>
-          <Button mode="outlined" icon="facebook" textColor="#1877F2" onPress={() => navigation.navigate('SocialRegister', { provider: 'Facebook' })} style={styles.socialButton}> הירשם עם Facebook </Button>
+          <Button
+            mode="outlined"
+            icon="google"
+            textColor="#DB4437"
+            onPress={() => navigation.navigate('SocialRegister', { provider: 'Google' })}
+            style={styles.socialButton}
+          >
+            הירשם עם Google
+          </Button>
+          <Button
+            mode="outlined"
+            icon="facebook"
+            textColor="#1877F2"
+            onPress={() => navigation.navigate('SocialRegister', { provider: 'Facebook' })}
+            style={styles.socialButton}
+          >
+            הירשם עם Facebook
+          </Button>
         </Animated.View>
 
         <TouchableOpacity onPress={() => navigation.navigate('Login')}>

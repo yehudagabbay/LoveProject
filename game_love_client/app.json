@@ -2,6 +2,7 @@
   "expo": {
     "name": "game_love_client",
     "slug": "game_love_client",
+    "owner": "yehudagabbay",
     "scheme": "loveclient",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -13,21 +14,15 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "ios": {
-      "supportsTablet": true
-    },
+    "ios": { "supportsTablet": true },
     "android": {
       "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#ffffff" 
       }
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    },
-    "plugins": [
-      "expo-web-browser"
-    ]
+    "web": { "favicon": "./assets/favicon.png" },
+    "plugins": ["expo-web-browser"]
   }
 }
