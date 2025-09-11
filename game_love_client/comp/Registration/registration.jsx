@@ -1,11 +1,4 @@
-// Registration.jsx
-// ------------------------------------------------------------
-// מסך רישום עם:
-// 1) ולידציה אחת (validate) — משמשת גם לשדה בודד וגם לכל הטופס.
-// 2) שליחה לשרת שלך: POST /api/users (UsersController.CreateUser).
-//    שולחים את הסיסמה בשדה PasswordHash — בצד השרת אתה קורא user.HashPassword().
-// 3) הערות ברורות + מצב טעינה.
-// ------------------------------------------------------------
+
 
 import React, { useState, useRef, useEffect } from 'react';
 import {
@@ -21,10 +14,7 @@ import {
 } from 'react-native';
 import { TextInput, Button } from 'react-native-paper';
 
-// === עדכן את הכתובת לפי סביבת הריצה ===
-// אמולטור אנדרואיד:  http://10.0.2.2:7279/api
-// מכשיר אמיתי:       http://<IP-של-המחשב>:7279/api
-// Expo Web:           http://localhost:7279/api
+
 const API_BASE = 'http://loveGame.somee.com/api';
 
 const Registration = ({ navigation }) => {
@@ -60,16 +50,12 @@ const Registration = ({ navigation }) => {
   const animatedHeight = detailsAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 325] });
   const animatedSocialTranslate = socialAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 0] });
 
-  // ------------------------------------------------------------
-  // ולידציה אחת: אם שולחים field+value → בודק רק אותו שדה ומעדכן errors.
-  // אם לא שולחים כלום → בודק את כל הטופס ומחזיר true/false.
-  // ------------------------------------------------------------
+
   const validate = (field, value) => {
     // כללי עזר
     const emailRegex    = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d).{6,}$/;
 
-    // נשתמש ב-snapshot של הערכים העדכניים
     const model = {
       nickname,
       gender,
@@ -80,7 +66,6 @@ const Registration = ({ navigation }) => {
       ...(field ? { [field]: value } : {}), // אם הגיעה ערך זמני (onChange), נכניס אותו לחישוב
     };
 
-    // פונקציה שמייצרת אובייקט שגיאות מלא לפי המודל הנתון
     const buildErrors = (m) => {
       const e = {};
 
@@ -102,7 +87,6 @@ const Registration = ({ navigation }) => {
     };
 
     if (field) {
-      // מצב של onChange בשדה בודד: בונים errors מלאים אבל נעדכן סטייט רק אם יש שינוי אמיתי
       const nextErrors = buildErrors(model);
       setErrors(nextErrors);
       // אין צורך ב-return כאן
@@ -115,52 +99,57 @@ const Registration = ({ navigation }) => {
     return Object.keys(allErrors).length === 0;
   };
 
-  // ------------------------------------------------------------
-  // שליחה לשרת: POST /api/users  (UsersController.CreateUser)
-  // שולחים: nickname, gender, email, passwordHash (הסיסמה הגולמית), age
-  // בצד השרת: user.HashPassword() יצפין וישמור.
-  // ------------------------------------------------------------
+
   const registerUser = async () => {
-    // בדיקת-כול עם אותה ולידציה
-    const ok = validate(); // בלי פרמטרים → בודק את כל הטופס
-    if (!ok) return;
+  if (!validate()) return;
 
-    setBusy(true);
+  setBusy(true);
+  try {
+    const payload = {
+      nickname: nickname.trim(),
+      gender,
+      email: email.trim(),
+      passwordHash: password,
+      age: Number(age),
+    };
+
+    const res = await fetch(`${API_BASE}/users/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    let raw = '';
+    let data = null;
     try {
-      const payload = {
-        nickname: nickname.trim(),
-        gender,
-        email: email.trim(),
-        passwordHash: password,   // ← חשוב! בצד השרת תקרא HashPassword()
-        age: Number(age),
-      };
+      raw = await res.text();
+      data = raw ? JSON.parse(raw) : null;
+    } catch { /* לא JSON – נתעלם */ }
 
-      const res = await fetch(`${API_BASE}/users/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (res.status === 201) {
-        Alert.alert('הצלחה', 'נרשמת בהצלחה!');
-        navigation.navigate('Login', { email: email.trim() });
-        return;
-      }
-
-      if (res.status === 400) {
-        const txt = await res.text().catch(() => '');
-        Alert.alert('שגיאה', txt || 'האימייל כבר קיים במערכת');
-        return;
-      }
-
-      const txt = await res.text().catch(() => '');
-      Alert.alert('שגיאה', txt || `שגיאה ברישום (HTTP ${res.status})`);
-    } catch (err) {
-      Alert.alert('תקלה ברשת', err?.message || String(err));
-    } finally {
-      setBusy(false);
+    if (res.ok) {
+      Alert.alert('הצלחה', data?.message || 'נרשמת בהצלחה!', [
+        {
+          text: 'אישור',
+          onPress: () =>
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'Login', params: { email: email.trim() } }],
+            }),
+        },
+      ]);
+      return;
     }
-  };
+
+    // כל תשובה שלילית
+    const errMsg = data?.message || data?.error || raw || `שגיאה ברישום (HTTP ${res.status})`;
+    Alert.alert('שגיאה', errMsg);
+  } catch (err) {
+    Alert.alert('תקלה ברשת', err?.message || String(err));
+  } finally {
+    setBusy(false);
+  }
+};
+
 
   return (
     <ImageBackground

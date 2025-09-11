@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from "react-native";
+// comp/game/IndexGame.js
+import React, { useState } from "react";
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Alert } from "react-native";
 import { Svg, G, Path } from "react-native-svg";
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from "react-native-reanimated";
+import * as SecureStore from "expo-secure-store";
 
 const windowWidth = Dimensions.get("window").width;
 const rouletteSize = Math.min(300, windowWidth - 40);
@@ -17,23 +19,29 @@ const sections = [
   { label: "משימה 8", color: "#FF0000" },
   { label: "משימה 8", color: "#FFC0CB" },
   { label: "משימה 8", color: "#00FFFF" },
-  
 ];
 
-export default function IndexGame() {
+export default function IndexGame({ navigation, route }) {
   const [isSpinning, setIsSpinning] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
   const rotation = useSharedValue(0);
+
+  const handleLogout = async () => {
+    try {
+      await SecureStore.deleteItemAsync("lg_user"); // ניתוק מלא מהמכשיר
+      await SecureStore.deleteItemAsync("lg_userId"); // אם שמרת גם userId בנפרד
+    } catch {}
+    navigation.reset({ index: 0, routes: [{ name: "Login" }] }); // חזרה ל-LOGIN וניקוי היסטוריית ניווט
+  };
 
   const spinRoulette = () => {
     if (isSpinning) return;
     setIsSpinning(true);
     setSelectedTask(null);
 
-    const spins = Math.floor(Math.random() * 5 + 3);
+    const spins = Math.floor(Math.random() * 5 + 3); // 3-7 סיבובים
     const randomSection = Math.floor(Math.random() * sections.length);
     const degreesPerSection = 360 / sections.length;
-
     const targetRotation = spins * 360 + randomSection * degreesPerSection;
 
     rotation.value = withTiming(
@@ -43,19 +51,34 @@ export default function IndexGame() {
         if (finished) {
           runOnJS(setIsSpinning)(false);
           runOnJS(setSelectedTask)(sections[randomSection].label);
+          rotation.value = targetRotation % 360;
         }
       }
     );
   };
 
-  const animatedStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ rotate: `${rotation.value}deg` }],
-    };
-  });
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${rotation.value}deg` }],
+  }));
+
+  const goToGameHome = () => {
+    const userId = route?.params?.userId;
+    const selection = route?.params?.selection;
+    navigation.navigate("GameHome", { userId, selection });
+  };
 
   return (
     <View style={styles.container}>
+      {/* 🔹 כפתור חזרה להגדרות המשחק */}
+      <TouchableOpacity style={styles.backBtn} onPress={goToGameHome}>
+        <Text style={styles.backText}>הגדרות</Text>
+      </TouchableOpacity>
+
+      {/* 🔹 כפתור התנתק */}
+      <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+        <Text style={styles.logoutText}>התנתק</Text>
+      </TouchableOpacity>
+
       <Text style={styles.title}>רולטה מסתובבת</Text>
 
       <View style={styles.rouletteContainer}>
@@ -98,7 +121,7 @@ export default function IndexGame() {
       {selectedTask && (
         <TouchableOpacity
           style={styles.button}
-          onPress={() => alert(`המשימה שלכם: ${selectedTask}`)}
+          onPress={() => Alert.alert("המשימה שלכם", selectedTask)}
         >
           <Text style={styles.buttonText}>חשוף קלף</Text>
         </TouchableOpacity>
@@ -114,6 +137,36 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     padding: 20,
+  },
+  backBtn: {
+    position: "absolute",
+    top: 40,
+    left: 16,
+    zIndex: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: "rgba(0,0,0,0.06)",
+  },
+  backText: {
+    fontSize: 14,
+    fontWeight: "bold",
+    color: "#1976d2",
+  },
+  logoutBtn: {
+    position: "absolute",
+    top: 40,
+    right: 16,
+    zIndex: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: "rgba(0,0,0,0.06)",
+  },
+  logoutText: {
+    fontSize: 14,
+    fontWeight: "bold",
+    color: "#d32f2f",
   },
   title: {
     fontSize: 24,
@@ -159,4 +212,3 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
 });
-
