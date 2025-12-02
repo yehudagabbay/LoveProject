@@ -17,8 +17,11 @@ import Settings from './comp/Settings/Settings';
 import GameHome from './comp/game/GameHome';
 import WelcomeScreen from './comp/Welcome/WelcomeScreen';
 import GameModeSelect from './comp/Welcome/GameModeSelect';
-import FamilyGame from './comp/game/FamilyGame';
-import FriendsGame from './comp/game/FriendsGame';
+import FriendsCardsGame from './comp/game/FriendGame/FriendsCardsGame';
+import FriendsCardsSelect from './comp/game/FriendGame/FriendsCardsSelect';
+import FamilyCardsSelect from './comp/game/FamilyGame/FamilyCardsSelect';
+import FamilyCardsGame from './comp/game/FamilyGame/FimilyCardsGame';
+import  GameTimer from './comp/Settings/GameTimer';
 
 
 export default function App() {
@@ -49,10 +52,12 @@ export default function App() {
         <Stack.Screen name="Registration" component={Registration} />
         <Stack.Screen name="SocialRegister" component={SocialRegister} />
         <Stack.Screen name="IndexGame" component={IndexGame} />
-        <Stack.Screen name="FamilyGame" component={FamilyGame} />
-        <Stack.Screen name="FriendsGame" component={FriendsGame} />
         <Stack.Screen name="GameHome" component={require('./comp/game/GameHome').default} />
         <Stack.Screen name="Settings" component={Settings} options={{ title: 'הגדרות' }} />
+        <Stack.Screen name="FriendsCardsGame" component={FriendsCardsGame} />
+        <Stack.Screen name="FriendsCardsSelect" component={FriendsCardsSelect} />
+        <Stack.Screen name="FamilyCardsSelect" component={FamilyCardsSelect} />
+        <Stack.Screen name="FamilyCardsGame" component={FamilyCardsGame} />
       </Stack.Navigator>
       <StatusBar style="auto" />
     </NavigationContainer>

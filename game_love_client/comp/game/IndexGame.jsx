@@ -1,4 +1,5 @@
 // comp/game/IndexGame.jsx
+
 import React, {
   useMemo,
   useState,
@@ -19,7 +20,7 @@ import {
   Easing,
   Image,
   PanResponder,
-  TextInput, // תיבת טקסט למשוב
+  TextInput,
 } from 'react-native';
 import { LogoutButton } from '../Settings/Settings';
 import logo1 from '../../assets/images/logo1.png';
@@ -29,22 +30,24 @@ import iconLove from '../../assets/images/icons/love.png';
 import iconFun from '../../assets/images/icons/fun.png';
 import iconRelations from '../../assets/images/icons/relations.png';
 
-// --- חישוב רוחב מסך ---
+// ⏱ טיימר
+import { GameTimer } from '../Settings/GameTimer';
+
+// --- חישוב רוחב וגובה מסך ---
 const W = Math.min(
   520,
   Math.max(320, Math.round(Dimensions.get('window').width - 40)),
 );
 
-// ================== כתובת API למשוב ==================
-const FEEDBACK_URL =
-  'http://lovegame.somee.com/api/Users/submit-feedback';
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// הוצאת UserID מתוך ה־route
+// ================== כתובת API למשוב ==================
+const FEEDBACK_URL = 'http://lovegame.somee.com/api/Users/submit-feedback';
+
 const getCurrentUserId = (route) =>
   route?.params?.userId ??
   route?.params?.user?.UserID ??
   0;
-// =====================================================
 
 // --- קבועים ועזרים ---
 const CAT_COLORS = { 1: '#1976D2', 2: '#009688', 3: '#E91E63' };
@@ -56,21 +59,9 @@ const heartsByCat = { 1: '💙', 2: '💙💙', 3: '💙💙💙' };
 const stars = (n) => '⭐'.repeat(Math.max(1, Math.min(3, n)));
 
 const CATEGORY_THEME = {
-  1: {
-    name: 'Relations',
-    bgColor: '#FDB4A4',
-    icon: iconRelations,
-  },
-  2: {
-    name: 'Fun',
-    bgColor: '#FBB6E1',
-    icon: iconFun,
-  },
-  3: {
-    name: 'Love',
-    bgColor: '#FCD29F',
-    icon: iconLove,
-  },
+  1: { name: 'Relations', bgColor: '#FDB4A4', icon: iconRelations },
+  2: { name: 'Fun', bgColor: '#FBB6E1', icon: iconFun },
+  3: { name: 'Love', bgColor: '#FCD29F', icon: iconLove },
 };
 
 const DEFAULT_THEME = {
@@ -87,7 +78,21 @@ const DECK_LAYERS = [
 ];
 
 export default function IndexGame({ route, navigation }) {
-  const { cards = [] } = route?.params || {};
+  const { cards = [], players: routePlayers = [] } = route?.params || {};
+
+  // שמות השחקנים – לזוגות יש ברירת מחדל אם לא הוזן
+  const players = useMemo(() => {
+    if (
+      Array.isArray(routePlayers) &&
+      routePlayers.filter((p) => p && p.trim().length > 0).length >= 2
+    ) {
+      return routePlayers.filter((p) => p && p.trim().length > 0);
+    }
+    return ['שחקן 1', 'שחקן 2'];
+  }, [routePlayers]);
+
+  // תור השחקן הנוכחי
+  const [currentPlayerIndex, setCurrentPlayerIndex] = useState(0);
 
   // --- אנימציות ---
   const pulseAnim = useRef(new Animated.Value(0)).current;
@@ -124,7 +129,7 @@ export default function IndexGame({ route, navigation }) {
     ).start();
   }, [entryAnim, pulseAnim]);
 
-  // --- לוגיקה של הקלפים ---
+  // --- לוגיקה של קלפים --- //
   const mapById = useMemo(() => {
     const m = new Map();
     for (const c of cards) {
@@ -142,7 +147,7 @@ export default function IndexGame({ route, navigation }) {
   const [revealedCount, setRevealedCount] = useState(0);
   const [lastCombo, setLastCombo] = useState(null);
 
-  // --- משוב: מצב שליחת משוב + מודאל נפרד ---
+  // משוב
   const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
   const [sendingFeedback, setSendingFeedback] = useState(false);
@@ -150,9 +155,12 @@ export default function IndexGame({ route, navigation }) {
   const remainingCount = remaining.size;
   const totalCount = cards.length;
 
+  const advanceTurn = () => {
+    setCurrentPlayerIndex((prev) => (prev + 1) % players.length);
+  };
+
   const revealRandomCard = () => {
     if (remaining.size === 0) return;
-
     const ids = Array.from(remaining);
     const randIdx = Math.floor(Math.random() * ids.length);
     const id = ids[randIdx];
@@ -167,11 +175,18 @@ export default function IndexGame({ route, navigation }) {
     if (remainingCount === 0) {
       Alert.alert(
         'נגמרו הקלפים',
-        'שיחקתם בכל הקלפים. חזור להגדרות למשחק חדש.',
+        'שיחקתם בכל הקלפים. חזרו למסך ההגדרות כדי להתחיל משחק חדש.',
+        [
+          {
+            text: 'להגדרות',
+            onPress: () =>
+              navigation.navigate('GameHome'),
+          },
+          { text: 'סגור', style: 'cancel' },
+        ],
       );
       return;
     }
-
     Animated.timing(flyOutAnim, {
       toValue: 1,
       duration: 350,
@@ -203,6 +218,7 @@ export default function IndexGame({ route, navigation }) {
         setRevealedCount((n) => n + 1);
       }
     }
+    advanceTurn();
     setCurrentCardId(null);
     closeCardModal();
   };
@@ -217,23 +233,18 @@ export default function IndexGame({ route, navigation }) {
         });
       }
     }
+    advanceTurn();
     setCurrentCardId(null);
     closeCardModal();
   };
 
-  // --- פתיחת מודאל המשוב (בלי לשלוח עדיין) ---
   const openFeedbackModal = () => {
     if (!currentCardId) return;
-
     const userId = getCurrentUserId(route);
     if (!userId || userId <= 0) {
-      Alert.alert(
-        'שגיאה',
-        'לא נמצא משתמש מחובר לשליחת משוב. חזרו להתחברות ונסו שוב.',
-      );
+      Alert.alert('שגיאה', 'לא נמצא משתמש מחובר לשליחת משוב.');
       return;
     }
-
     setFeedbackText('');
     setFeedbackModalVisible(true);
   };
@@ -243,22 +254,15 @@ export default function IndexGame({ route, navigation }) {
     setFeedbackText('');
   };
 
-  // --- שליחת המשוב בפועל ל־API ---
   const submitFeedback = async () => {
     if (!currentCardId) return;
-
     const card = mapById.get(currentCardId);
     if (!card) return;
-
     const userId = getCurrentUserId(route);
     if (!userId || userId <= 0) {
-      Alert.alert(
-        'שגיאה',
-        'לא נמצא משתמש מחובר לשליחת משוב. חזרו להתחברות ונסו שוב.',
-      );
+      Alert.alert('שגיאה', 'לא נמצא משתמש מחובר.');
       return;
     }
-
     if (!feedbackText.trim()) {
       Alert.alert('משוב חסר', 'כתבו כמה מילים לפני שליחת המשוב.');
       return;
@@ -273,31 +277,16 @@ export default function IndexGame({ route, navigation }) {
 
     try {
       setSendingFeedback(true);
-
       const res = await fetch(FEEDBACK_URL, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.log('Feedback error body:', errorText);
-        throw new Error(
-          errorText || `Feedback status not OK: ${res.status}`,
-        );
-      }
-
+      if (!res.ok) throw new Error('Status not OK');
       Alert.alert('תודה!', 'המשוב נשלח בהצלחה.');
       closeFeedbackModal();
     } catch (err) {
-      console.error('Error sending feedback:', err);
-      Alert.alert(
-        'שגיאה',
-        'לא ניתן היה לשלוח את המשוב כרגע, נסו שוב מאוחר יותר.',
-      );
+      Alert.alert('שגיאה', 'לא ניתן היה לשלוח את המשוב כרגע.');
     } finally {
       setSendingFeedback(false);
     }
@@ -308,10 +297,9 @@ export default function IndexGame({ route, navigation }) {
 
   const panResponder = PanResponder.create({
     onStartShouldSetPanResponder: () => !showModal && remainingCount > 0,
-    onPanResponderMove: Animated.event(
-      [null, { dx: pan.x, dy: pan.y }],
-      { useNativeDriver: false },
-    ),
+    onPanResponderMove: Animated.event([null, { dx: pan.x, dy: pan.y }], {
+      useNativeDriver: false,
+    }),
     onPanResponderRelease: (e, gesture) => {
       const threshold = 80;
       if (Math.abs(gesture.dx) > threshold) {
@@ -337,17 +325,22 @@ export default function IndexGame({ route, navigation }) {
   const rawCategoryId =
     currentCard?.CategoryID ?? currentCard?.categoryID ?? null;
   const currentCategoryId =
-    rawCategoryId !== null && rawCategoryId !== undefined
-      ? Number(rawCategoryId)
-      : null;
-
+    rawCategoryId !== null ? Number(rawCategoryId) : null;
   const currentTheme =
     (currentCategoryId && CATEGORY_THEME[currentCategoryId]) ||
     DEFAULT_THEME;
 
   return (
     <View style={styles.screen}>
-      {/* --- חצי עליון: חפיסת הקלפים --- */}
+      {/* כותרת עליונה */}
+      <View style={styles.header}>
+        <Text style={styles.gameTitle}>משחק זוגות</Text>
+        <Text style={styles.gameSubTitle}>
+          זמן איכות זוגי סביב שאלות ומשימות ♥️
+        </Text>
+      </View>
+
+      {/* חצי עליון: חפיסת הקלפים */}
       <View style={styles.topHalf}>
         <View style={styles.deckContainer}>
           {remainingCount > 0 ? (
@@ -355,7 +348,6 @@ export default function IndexGame({ route, navigation }) {
               {DECK_LAYERS.map((layer, index) => {
                 const isVisible = remainingCount >= 3 - index;
                 if (!isVisible && remainingCount < 3) return null;
-
                 const isTopCard = index === 2;
 
                 const animatedRotate = entryAnim.interpolate({
@@ -378,7 +370,6 @@ export default function IndexGame({ route, navigation }) {
                   inputRange: [0, 1],
                   outputRange: [0, -5],
                 });
-
                 const flyTranslateY = isTopCard
                   ? flyOutAnim.interpolate({
                       inputRange: [0, 1],
@@ -413,11 +404,7 @@ export default function IndexGame({ route, navigation }) {
                 ];
 
                 const finalTransforms = isTopCard
-                  ? [
-                      ...baseTransforms,
-                      { translateX: pan.x },
-                      { translateY: pan.y },
-                    ]
+                  ? [...baseTransforms, { translateX: pan.x }, { translateY: pan.y }]
                   : baseTransforms;
 
                 return (
@@ -467,23 +454,23 @@ export default function IndexGame({ route, navigation }) {
             <View style={styles.emptyBox}>
               <Text style={styles.emptyTitle}>החפיסה ריקה!</Text>
               <Text style={styles.emptySub}>
-                חזור למסך ההגדרות כדי להתחיל משחק חדש.
+                חזרו להגדרות כדי להתחיל משחק חדש.
               </Text>
             </View>
           )}
         </View>
       </View>
 
-      {/* --- חצי תחתון: כפתורים + סטטוס משחק --- */}
+      {/* חצי תחתון */}
       <View style={styles.bottomHalf}>
+        {/* כפתורי שליפה / הגדרות */}
         <View style={styles.controlsBox}>
           <View style={styles.controlsRow}>
             <TouchableOpacity
               style={[
                 styles.btn,
                 styles.drawBtn,
-                (remainingCount === 0 || showModal) &&
-                  styles.btnDisabled,
+                (remainingCount === 0 || showModal) && styles.btnDisabled,
               ]}
               onPress={handleDrawPress}
               disabled={remainingCount === 0 || showModal}
@@ -495,7 +482,7 @@ export default function IndexGame({ route, navigation }) {
               style={[styles.btn, styles.backBtn]}
               onPress={() => navigation.navigate('GameHome')}
             >
-              <Text style={styles.btnTextDark}>חזרה להגדרות</Text>
+              <Text style={styles.btnTextDark}>הגדרות</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -505,6 +492,14 @@ export default function IndexGame({ route, navigation }) {
           <Text style={styles.subTitle}>
             כרטיסים שסיימתם: {revealedCount} / {totalCount}
           </Text>
+
+          {/* תור השחקן */}
+          <View style={styles.playerTurnBadge}>
+            <Text style={styles.playerTurnLabel}>עכשיו תור:</Text>
+            <Text style={styles.playerTurnName}>
+              {players[currentPlayerIndex]}
+            </Text>
+          </View>
 
           {lastCombo ? (
             <View
@@ -542,7 +537,7 @@ export default function IndexGame({ route, navigation }) {
         </View>
       </View>
 
-      {/* --- מודאל: קלף שנחשף --- */}
+      {/* --- מודאל קלף --- */}
       <Modal
         visible={showModal}
         transparent
@@ -578,7 +573,8 @@ export default function IndexGame({ route, navigation }) {
                             styles.modalCategoryText,
                             {
                               color:
-                                CAT_COLORS[currentCategoryId] || '#333',
+                                CAT_COLORS[currentCategoryId] ||
+                                '#333',
                             },
                           ]}
                         >
@@ -586,10 +582,15 @@ export default function IndexGame({ route, navigation }) {
                         </Text>
                         <Text style={styles.modalLevelText}>
                           {levelName(
-                            currentCard.LevelID ?? currentCard.levelID,
+                            currentCard.LevelID ??
+                              currentCard.levelID,
                           )}
                         </Text>
                       </View>
+
+                      <Text style={styles.turnBadge}>
+                        התור של: {players[currentPlayerIndex]}
+                      </Text>
 
                       <View style={styles.cardDivider} />
 
@@ -605,6 +606,13 @@ export default function IndexGame({ route, navigation }) {
                         </Text>
                       </ScrollView>
 
+                      {/* ⏱ טיימר – מתאפס לכל קלף חדש */}
+                      <GameTimer
+                        key={currentCardId}
+                        mode="timer"
+                        defaultTime={60}
+                      />
+
                       <View style={styles.modalCardFooter}>
                         <Text style={styles.footerIcons}>
                           {heartsByCat[currentCategoryId]}{' '}
@@ -618,7 +626,7 @@ export default function IndexGame({ route, navigation }) {
                   </View>
                 </View>
 
-                {/* כפתורי פעולה מתחת לקלף */}
+                {/* כפתורי פעולה */}
                 <View style={styles.modalActionsRow}>
                   <TouchableOpacity
                     style={[
@@ -647,7 +655,7 @@ export default function IndexGame({ route, navigation }) {
                     ]}
                     onPress={openFeedbackModal}
                   >
-                    <Text style={styles.actionText}>כתוב משוב 📝</Text>
+                    <Text style={styles.actionText}>משוב 📝</Text>
                   </TouchableOpacity>
                 </View>
               </>
@@ -656,14 +664,17 @@ export default function IndexGame({ route, navigation }) {
         </Pressable>
       </Modal>
 
-      {/* --- מודאל משוב נפרד --- */}
+      {/* --- מודאל משוב --- */}
       <Modal
         visible={feedbackModalVisible}
         transparent
         animationType="fade"
         onRequestClose={closeFeedbackModal}
       >
-        <Pressable style={styles.backdrop} onPress={closeFeedbackModal}>
+        <Pressable
+          style={styles.backdrop}
+          onPress={closeFeedbackModal}
+        >
           <View
             style={styles.feedbackModalWrapper}
             onStartShouldSetResponder={() => true}
@@ -673,15 +684,31 @@ export default function IndexGame({ route, navigation }) {
               כתבו לנו מה חשבתם על הקלף שקיבלתם
             </Text>
 
-            <TextInput
-              style={styles.feedbackInput}
-              placeholder="כתבו כאן את המשוב…"
-              placeholderTextColor="rgba(0,0,0,0.35)"
-              multiline
-              value={feedbackText}
-              onChangeText={setFeedbackText}
-              textAlignVertical="top"
-            />
+            <ScrollView>
+              <Text
+                style={{
+                  fontSize: 14,
+                  color: '#6B7280',
+                  marginBottom: 8,
+                  textAlign: 'right',
+                }}
+              >
+                המשוב עוזר לנו לשפר את המשחק ולהוסיף משימות שמתאימות
+                לזוגות כמוכם.
+              </Text>
+            </ScrollView>
+
+            <View style={{ marginTop: 10 }}>
+              <TextInput
+                style={styles.feedbackInput}
+                placeholder="כתבו כאן את המשוב…"
+                placeholderTextColor="rgba(0,0,0,0.35)"
+                multiline
+                value={feedbackText}
+                onChangeText={setFeedbackText}
+                textAlignVertical="top"
+              />
+            </View>
 
             <View style={styles.feedbackButtonsRow}>
               <TouchableOpacity
@@ -698,7 +725,10 @@ export default function IndexGame({ route, navigation }) {
               <TouchableOpacity
                 style={[
                   styles.feedbackBtn,
-                  { backgroundColor: '#2563EB', opacity: sendingFeedback ? 0.6 : 1 },
+                  {
+                    backgroundColor: '#2563EB',
+                    opacity: sendingFeedback ? 0.6 : 1,
+                  },
                 ]}
                 onPress={submitFeedback}
                 disabled={sendingFeedback}
@@ -723,20 +753,38 @@ export default function IndexGame({ route, navigation }) {
   );
 }
 
-// --- סגנונות ---
+// ==============================================
+// ================= עיצוב ======================
+// ==============================================
+
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#f7f7fb',
+    backgroundColor: '#FFF0F5',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  header: {
+    paddingTop: 40,
+    paddingBottom: 10,
+    alignItems: 'center',
+  },
+  gameTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#111827',
+  },
+  gameSubTitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginTop: 4,
   },
   topHalf: {
     flex: 1,
     width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 12,
+    paddingTop: 10,
   },
   bottomHalf: {
     flex: 1,
@@ -744,11 +792,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-start',
     paddingHorizontal: 16,
+    paddingBottom: 10,
   },
   deckContainer: {
     height: W * 0.7,
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#E91E63',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
   },
   cardStackWrapper: {
     position: 'relative',
@@ -761,175 +814,189 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: '100%',
     height: '100%',
-    borderRadius: 20,
-    backgroundColor: '#1E3A8A',
+    borderRadius: 24,
+    backgroundColor: '#2c3e50',
+    borderWidth: 2,
+    borderColor: '#E91E63',
+    padding: 8,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    elevation: 10,
-    borderWidth: 1,
-    borderColor: '#60A5FA',
-    padding: 10,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 8,
   },
   innerBorder: {
     flex: 1,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.3)',
-    borderStyle: 'dashed',
-    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#34495e',
     overflow: 'hidden',
   },
   cardLogo: {
-    width: '100%',
-    height: '100%',
-    opacity: 1,
+    width: '80%',
+    height: '80%',
+    opacity: 0.9,
   },
   countBadge: {
     position: 'absolute',
-    bottom: -12,
-    right: -12,
-    backgroundColor: '#EF4444',
-    minWidth: 42,
-    height: 42,
-    borderRadius: 21,
+    top: -10,
+    right: -10,
+    backgroundColor: '#FF4081',
+    minWidth: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 20,
-    elevation: 15,
-    borderWidth: 3,
+    elevation: 10,
+    borderWidth: 2,
     borderColor: '#fff',
   },
   countText: {
     color: 'white',
-    fontWeight: '800',
-    fontSize: 16,
+    fontWeight: 'bold',
+    fontSize: 14,
   },
   emptyBox: {
-    padding: 24,
-    borderRadius: 16,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
+    padding: 30,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.9)',
     alignItems: 'center',
-    maxWidth: W * 0.85,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    elevation: 5,
   },
   emptyTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    marginBottom: 6,
-    color: '#111827',
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
   },
   emptySub: {
-    fontSize: 14,
-    color: '#6B7280',
-    textAlign: 'center',
-    lineHeight: 20,
+    fontSize: 15,
+    color: '#666',
+    marginTop: 5,
   },
   controlsBox: {
     width: W,
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 12,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
+    marginBottom: 16,
   },
   controlsRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 15,
     justifyContent: 'space-between',
   },
   btn: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 14,
+    paddingVertical: 16,
+    borderRadius: 50,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
   btnText: {
     color: '#fff',
     fontWeight: '800',
-    fontSize: 16,
+    fontSize: 18,
+    letterSpacing: 1,
   },
   btnTextDark: {
-    color: '#1F2937',
-    fontWeight: '800',
+    color: '#555',
+    fontWeight: '700',
     fontSize: 15,
   },
   drawBtn: {
-    backgroundColor: '#2563EB',
-    elevation: 4,
+    backgroundColor: '#FF4081',
+    flex: 1.5,
   },
   backBtn: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#fff',
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#eee',
   },
   btnDisabled: {
-    opacity: 0.5,
-    elevation: 0,
+    opacity: 0.6,
+    backgroundColor: '#ccc',
   },
   statusBox: {
     width: W,
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 16,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#fff',
   },
   title: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#111827',
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    opacity: 0.5,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 5,
   },
   subTitle: {
-    marginTop: 4,
     fontSize: 14,
-    color: '#6b7280',
+    color: '#666',
+    marginBottom: 15,
+  },
+  playerTurnBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E3F2FD',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    marginBottom: 15,
+    borderLeftWidth: 4,
+    borderLeftColor: '#2196F3',
+  },
+  playerTurnLabel: {
+    fontSize: 14,
+    color: '#555',
+    marginRight: 6,
+  },
+  playerTurnName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1565C0',
   },
   hint: {
     marginTop: 10,
-    fontSize: 13,
-    color: '#9CA3AF',
+    fontSize: 14,
+    color: '#888',
     fontStyle: 'italic',
+    textAlign: 'center',
   },
   lastCardBox: {
-    marginTop: 12,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
+    marginTop: 5,
+    padding: 15,
+    backgroundColor: '#fff',
+    borderRadius: 15,
     borderWidth: 1,
-    padding: 12,
-    borderLeftWidth: 5,
+    borderColor: '#eee',
   },
   lastCardTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    marginBottom: 2,
+    fontSize: 12,
+    color: '#999',
+    marginBottom: 4,
   },
   lastCardText: {
-    fontSize: 15,
-    color: '#334155',
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
   },
-
-  // מודאלים
   backdrop: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    paddingHorizontal: 16,
+    backgroundColor: 'rgba(44, 62, 80, 0.85)',
   },
   modalCenterWrapper: {
     flex: 1,
@@ -938,191 +1005,170 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   modalCardWrapper: {
-    width: '90%',
-    maxWidth: 360,
-    alignSelf: 'center',
-    marginBottom: 20,
+    width: '85%',
+    maxWidth: 340,
   },
   modalCardPhysicalBase: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 20,
+    backgroundColor: '#fff',
+    borderRadius: 30,
+    padding: 10,
+    elevation: 25,
+    maxHeight: SCREEN_HEIGHT * 0.9,
   },
   modalCardInnerContent: {
     width: '100%',
-    minHeight: W * 0.85,
-    maxHeight: W * 1.2,
-    borderRadius: 16,
-    paddingVertical: 24,
-    paddingHorizontal: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
-    position: 'relative',
-    overflow: 'hidden',
+    minHeight: SCREEN_HEIGHT * 0.75,
+    maxHeight: SCREEN_HEIGHT * 0.88,
+    borderRadius: 22,
+    padding: 25,
     justifyContent: 'space-between',
   },
   modalCardIconBg: {
     position: 'absolute',
-    width: 250,
-    height: 250,
-    bottom: -30,
-    right: -30,
-    opacity: 0.25,
-    transform: [{ rotate: '-15deg' }],
+    width: 200,
+    height: 200,
+    bottom: -20,
+    right: -20,
+    opacity: 0.15,
   },
   modalCardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   modalCategoryText: {
-    fontSize: 18,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#333',
+    letterSpacing: 1,
   },
   modalLevelText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: 'rgba(0,0,0,0.6)',
-    backgroundColor: 'rgba(255,255,255,0.5)',
-    paddingHorizontal: 10,
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#555',
+    backgroundColor: 'rgba(255,255,255,0.6)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  turnBadge: {
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 8,
+    marginTop: 10,
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
     overflow: 'hidden',
   },
   cardDivider: {
-    height: 1,
-    backgroundColor: 'rgba(0,0,0,0.1)',
-    marginVertical: 16,
-    width: '100%',
+    height: 2,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    marginVertical: 20,
+    width: '40%',
+    alignSelf: 'center',
   },
   modalCardBodyScroll: {
     flex: 1,
+    maxHeight: SCREEN_HEIGHT * 0.45,
   },
   modalScrollContent: {
-    paddingBottom: 20,
     justifyContent: 'center',
-    minHeight: 100,
+    alignItems: 'center',
+    paddingVertical: 10,
   },
   modalCardBodyText: {
-    fontSize: 22,
-    lineHeight: 32,
+    fontSize: 24,
+    lineHeight: 36,
     fontWeight: '600',
     color: '#1F2937',
     textAlign: 'center',
-    textShadowColor: 'rgba(255,255,255,0.4)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 1,
   },
   modalCardFooter: {
     marginTop: 10,
     alignItems: 'center',
-    justifyContent: 'center',
   },
   footerIcons: {
-    fontSize: 16,
-    opacity: 0.9,
+    fontSize: 18,
   },
   modalActionsRow: {
-    width: '90%',
-    maxWidth: 360,
+    marginTop: 20,
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
+    justifyContent: 'space-evenly',
+    width: '100%',
   },
   actionBtn: {
-    flex: 1,
-    paddingVertical: 14,
+    width: 60,
+    height: 60,
     borderRadius: 30,
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 4,
+    elevation: 5,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.2,
-    shadowRadius: 3,
+    shadowRadius: 4,
   },
   actionText: {
+    fontSize: 10,
     color: '#fff',
-    fontWeight: '700',
-    fontSize: 14,
+    fontWeight: 'bold',
+    marginTop: 2,
+    textAlign: 'center',
   },
-
-  // מודאל המשוב
   feedbackModalWrapper: {
-    width: '90%',
-    maxWidth: 360,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 15,
+    width: '85%',
+    backgroundColor: '#fff',
+    borderRadius: 25,
+    padding: 25,
   },
   feedbackTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    marginBottom: 4,
+    fontSize: 20,
+    fontWeight: 'bold',
     textAlign: 'center',
-    color: '#111827',
+    marginBottom: 5,
   },
   feedbackSubtitle: {
-    fontSize: 13,
-    color: '#6B7280',
     textAlign: 'center',
-    marginBottom: 12,
+    color: '#777',
+    marginBottom: 20,
   },
   feedbackInput: {
-    minHeight: 90,
-    maxHeight: 140,
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    backgroundColor: 'rgba(249,250,251,0.95)',
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.08)',
-    fontSize: 14,
-    color: '#111827',
+    backgroundColor: '#f9f9f9',
+    borderRadius: 15,
+    padding: 15,
+    height: 120,
+    textAlignVertical: 'top',
+    fontSize: 16,
   },
   feedbackButtonsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    marginTop: 20,
     gap: 10,
-    marginTop: 14,
   },
   feedbackBtn: {
     flex: 1,
-    paddingVertical: 10,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  feedbackBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 14,
-  },
-
-  footerRow: {
-    width: W,
-    marginVertical: 16,
-  },
-  logoutBtn: {
-    backgroundColor: '#EF4444',
-    paddingVertical: 12,
+    padding: 15,
     borderRadius: 12,
     alignItems: 'center',
   },
-  logoutText: {
+  feedbackBtnText: {
     color: '#fff',
-    fontWeight: '700',
+    fontWeight: 'bold',
+  },
+  footerRow: {
+    width: '100%',
+    padding: 10,
+    alignItems: 'center',
+  },
+  logoutBtn: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  logoutText: {
+    color: '#ff6b6b',
+    fontWeight: '600',
   },
 });
