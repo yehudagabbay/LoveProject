@@ -12,40 +12,57 @@ export default function Login({ route, navigation }) {
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const handleLogin = async () => {
-    if (!email.trim() || !password) {
-      Alert.alert('שגיאה', 'יש למלא אימייל וסיסמה.');
-      return;
-    }
-    setBusy(true);
-    try {
-      const res = await fetch(`${API_BASE}/users/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), password }),
+const handleLogin = async () => {
+  if (!email.trim() || !password) {
+    Alert.alert('שגיאה', 'יש למלא אימייל וסיסמה.');
+    return;
+  }
+
+  setBusy(true);
+
+  try {
+    const res = await fetch(`${API_BASE}/users/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.trim(), password }),
+    });
+
+    const raw = await res.text();
+    let data = null;
+
+    try { 
+      data = raw ? JSON.parse(raw) : null; 
+    } catch { }
+
+    if (res.ok) {
+      const user = data?.User || data?.user || {};
+      const userId = String(user.UserID ?? user.userID ?? user.id ?? '');
+
+      // 🟦 שמירת המשתמש המלא → חשוב לפתיחה אוטומטית בהמשך
+      await SecureStore.setItemAsync('lg_user', JSON.stringify(user));
+
+      // 🟩 מעבר למסך בחירת סגנון המשחק
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'GameModeSelect' }],
       });
 
-      const raw = await res.text();
-      let data = null;
-      try { data = raw ? JSON.parse(raw) : null; } catch { }
-
-      if (res.ok) {
-        
-        const user = data?.User || data?.user || {};
-        const userId = String(user.UserID ?? user.userID ?? user.id ?? '');
-        await SecureStore.setItemAsync('lg_userId', userId);
-        navigation.reset({ index: 0, routes: [{ name: 'GameHome', params: { userId } }] });
-
-        return;
-      }
-
-      Alert.alert('שגיאה', data?.message || data?.error || raw || `שגיאה בהתחברות (HTTP ${res.status})`);
-    } catch (err) {
-      Alert.alert('תקלה ברשת', err?.message || String(err));
-    } finally {
-      setBusy(false);
+      return;
     }
-  };
+
+    Alert.alert(
+      'שגיאה', 
+      data?.message || data?.error || raw || `שגיאה בהתחברות (HTTP ${res.status})`
+    );
+
+  } catch (err) {
+    Alert.alert('תקלה ברשת', err?.message || String(err));
+
+  } finally {
+    setBusy(false);
+  }
+};
+
 
   return (
     <View style={styles.container}>
