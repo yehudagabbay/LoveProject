@@ -22,6 +22,10 @@ import FriendsCardsSelect from './comp/game/FriendGame/FriendsCardsSelect';
 import FamilyCardsSelect from './comp/game/FamilyGame/FamilyCardsSelect';
 import FamilyCardsGame from './comp/game/FamilyGame/FimilyCardsGame';
 import  GameTimer from './comp/Settings/GameTimer';
+import AgeGate from './comp/Settings/AgeGate';
+import TopMenu from './comp/Settings/TopMenu';
+import FeedbackScreen from './comp/Settings/FeedbackScreen';
+import Help from './comp/Settings/Help';
 
 
 export default function App() {
@@ -58,6 +62,9 @@ export default function App() {
         <Stack.Screen name="FriendsCardsSelect" component={FriendsCardsSelect} />
         <Stack.Screen name="FamilyCardsSelect" component={FamilyCardsSelect} />
         <Stack.Screen name="FamilyCardsGame" component={FamilyCardsGame} />
+        <Stack.Screen name ="TopMenu" component={TopMenu} />
+        <Stack.Screen name ="FeedbackScreen" component={FeedbackScreen} />
+        <Stack.Screen name="Help" component={Help}/>
       </Stack.Navigator>
       <StatusBar style="auto" />
     </NavigationContainer>

@@ -14,8 +14,9 @@ import {
   Platform,
 } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
-import { LogoutButton } from '../Settings/Settings';
+import { StatusBar } from 'expo-status-bar';
 import AnimatedLogo from '../Settings/AnimatedLogo';
+import TopMenu from '../Settings/TopMenu';
 
 // ───────────────────────────────────────────────────────────────
 // כתובות API (HTTP + HTTPS, ו-uppercase/lowercase של הנתיב)
@@ -50,7 +51,6 @@ async function fetchSelectedCards(selections) {
   for (const base of API_BASES) {
     for (const path of API_PATHS) {
       const url = `${base}/${path}`;
-      console.log('🌐 trying URL:', url);
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);
@@ -69,8 +69,6 @@ async function fetchSelectedCards(selections) {
         const raw = await res.text();
         clearTimeout(timeoutId);
 
-        console.log('📥 raw response:', raw);
-
         let data = null;
         try {
           data = raw ? JSON.parse(raw) : null;
@@ -79,12 +77,10 @@ async function fetchSelectedCards(selections) {
         }
 
         if (res.ok) {
-          console.log('✅ fetchSelectedCards OK');
           return data;
         }
 
         if (res.status === 404) {
-          console.log('⚠️ 404 on', url);
           continue;
         }
 
@@ -92,7 +88,6 @@ async function fetchSelectedCards(selections) {
         throw new Error(msg);
       } catch (e) {
         clearTimeout(timeoutId);
-        console.log('❌ fetch error:', e.name, e.message);
         lastErr = e;
       }
     }
@@ -121,7 +116,6 @@ export default function GameHome({ navigation, route }) {
       if (!userId) {
         const saved = await SecureStore.getItemAsync('lg_userId');
         if (saved) {
-          console.log('📌 loaded userId from SecureStore:', saved);
           setUserId(saved);
         }
       }
@@ -285,17 +279,37 @@ export default function GameHome({ navigation, route }) {
     }
   };
 
+  // --- ניווט מהתפריט ---
+  const handleMenuLogout = () => {
+    navigation.reset({ index: 0, routes: [{ name: 'Welcome' }] });
+  };
+  const showInfo = (msg) => Alert.alert('מידע', msg);
+
   // ───────────────────────────────────────────────────────────────
   // UI
   // ───────────────────────────────────────────────────────────────
   return (
     <View style={styles.mainContainer}>
+      <StatusBar style="dark" />
+      
+      {/* תפריט עליון */}
+      <TopMenu
+        navigation={navigation}
+        onSelectCoupleCards={() => {}} // אנחנו כבר כאן
+        onSelectFamilyCards={() => navigation.navigate('FamilyCardsSelect', { userId })}
+        onSelectFriendsCards={() => navigation.navigate('FriendsCardsSelect', { userId })}
+        onContact={() => showInfo('צור קשר - בקרוב')}
+        onFeedback={() => showInfo('פידבק - בקרוב')}
+        onHelp={() => showInfo('עזרה - בקרוב')}
+        onLogout={handleMenuLogout}
+      />
+
       {/* לוגו אנימציה ברקע */}
       <AnimatedLogo style={styles.backgroundLogo} />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}
+        style={styles.contentWrapper}
       >
         <ScrollView
           contentContainerStyle={styles.scrollContent}
@@ -317,6 +331,7 @@ export default function GameHome({ navigation, route }) {
                 value={player1Name}
                 onChangeText={setPlayer1Name}
                 placeholderTextColor="#9CA3AF"
+                textAlign="right"
               />
             </View>
 
@@ -332,6 +347,7 @@ export default function GameHome({ navigation, route }) {
                 value={player2Name}
                 onChangeText={setPlayer2Name}
                 placeholderTextColor="#9CA3AF"
+                textAlign="right"
               />
             </View>
           </View>
@@ -364,7 +380,11 @@ export default function GameHome({ navigation, route }) {
             onChange={setPassionLevels}
           />
 
-          {/* כפתור התחלה */}
+          <View style={{ height: 80 }} />
+        </ScrollView>
+
+        {/* כפתור קבוע למטה – כמו במשחק משפחה */}
+        <View style={styles.footerRow}>
           <TouchableOpacity
             style={[styles.playButton, busy && styles.playButtonDisabled]}
             onPress={goNext}
@@ -380,15 +400,7 @@ export default function GameHome({ navigation, route }) {
               </>
             )}
           </TouchableOpacity>
-
-          {/* התנתקות */}
-          <LogoutButton
-            navigation={navigation}
-            style={{ alignSelf: 'center', marginTop: 20 }}
-          />
-
-          <View style={{ height: 40 }} />
-        </ScrollView>
+        </View>
       </KeyboardAvoidingView>
     </View>
   );
@@ -412,9 +424,14 @@ const styles = StyleSheet.create({
     opacity: 0.3,
   },
 
+  contentWrapper: {
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+
   scrollContent: {
     alignItems: 'center',
-    paddingTop: 40,
+    paddingTop: 85, // מקום לתפריט העליון
     paddingHorizontal: 16,
   },
 
@@ -501,23 +518,25 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   cardHeader: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
     marginBottom: 12,
+    gap: 12,
   },
   cardIcon: {
     fontSize: 32,
-    marginRight: 12,
   },
   cardTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: '#333',
+    textAlign: 'right',
   },
   cardDesc: {
     fontSize: 12,
     color: '#888',
     marginTop: 2,
+    textAlign: 'right',
   },
   divider: {
     height: 1,
@@ -526,7 +545,7 @@ const styles = StyleSheet.create({
   },
 
   starsContainer: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
@@ -567,6 +586,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
+  footerRow: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
   playButton: {
     width: ROW_W,
     backgroundColor: '#E91E63',
@@ -575,7 +598,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 10,
     shadowColor: '#E91E63',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,

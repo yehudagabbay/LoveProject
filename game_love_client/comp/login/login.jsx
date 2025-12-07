@@ -1,16 +1,31 @@
 // comp/Login/Login.jsx
 import React, { useState } from 'react';
-import { View, StyleSheet, Alert } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  Alert,
+  ImageBackground,
+  Dimensions,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableOpacity,
+  ScrollView,
+} from 'react-native';
 import { TextInput, Button, Text } from 'react-native-paper';
 import * as SecureStore from 'expo-secure-store';
 
+// ✅ ייבוא הלוגו המונפש
+import AnimatedLogo from '../Settings/AnimatedLogo'; 
+
 const API_BASE = 'http://lovegame.somee.com/api';
+const { width } = Dimensions.get('window');
 
 export default function Login({ route, navigation }) {
   const prefilledEmail = route?.params?.email || '';
   const [email, setEmail] = useState(prefilledEmail);
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleLogin = async () => {
     if (!email.trim() || !password) {
@@ -30,7 +45,9 @@ export default function Login({ route, navigation }) {
       const raw = await res.text();
       let data = null;
 
-      try { data = raw ? JSON.parse(raw) : null; } catch {}
+      try {
+        data = raw ? JSON.parse(raw) : null;
+      } catch {}
 
       if (res.ok) {
         const user = data?.User || data?.user || {};
@@ -41,21 +58,12 @@ export default function Login({ route, navigation }) {
           return;
         }
 
-        // 🟦 שמירת מזהה משתמש (משמש לפתיחה אוטומטית)
         await SecureStore.setItemAsync('lg_userId', userId);
-
-        // 🟦 שמירת המשתמש המלא (אם תרצה להשתמש בו בהמשך)
         await SecureStore.setItemAsync('lg_user', JSON.stringify(user));
 
-        // 🟩 מעבר למסך בחירת מצב המשחק – עם userId
         navigation.reset({
           index: 0,
-          routes: [
-            {
-              name: 'GameModeSelect',
-              params: { userId, user },
-            },
-          ],
+          routes: [{ name: 'GameModeSelect', params: { userId, user } }],
         });
 
         return;
@@ -63,9 +71,11 @@ export default function Login({ route, navigation }) {
 
       Alert.alert(
         'שגיאה',
-        data?.message || data?.error || raw || `שגיאה בהתחברות (HTTP ${res.status})`
+        data?.message ||
+          data?.error ||
+          raw ||
+          `שגיאה בהתחברות (HTTP ${res.status})`
       );
-
     } catch (err) {
       Alert.alert('תקלה ברשת', err?.message || String(err));
     } finally {
@@ -74,46 +84,171 @@ export default function Login({ route, navigation }) {
   };
 
   return (
-    <View style={styles.container}>
-      <Button
-        mode="text"
-        compact
-        onPress={() => navigation.navigate('Registration')}
-        style={styles.backBtn}
-        icon="arrow-right"
+    <ImageBackground
+      source={require('../../assets/images/login_bg1.png')} 
+      style={styles.bg}
+      resizeMode="cover"
+    >
+      <View style={styles.overlay} />
+
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
       >
-        חזרה לרישום
-      </Button>
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          
+          <View style={styles.logoContainer}>
+             {/* הלוגו המונפש */}
+             <AnimatedLogo style={styles.logo} />
+          </View>
 
-      <Text style={styles.title}>התחברות</Text>
+          <View style={styles.card}>
+            <Text style={styles.title}>ברוכים השבים ❤️</Text>
+            <Text style={styles.subtitle}>התחברו כדי להמשיך במשחק</Text>
 
-      <TextInput
-        label="אימייל"
-        value={email}
-        onChangeText={setEmail}
-        autoCapitalize="none"
-        keyboardType="email-address"
-        style={styles.input}
-      />
+            <TextInput
+              label="אימייל"
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              mode="outlined"
+              style={styles.input}
+              outlineColor="transparent"
+              activeOutlineColor="#E91E63"
+              theme={{ roundness: 12 }}
+              left={<TextInput.Icon icon="email-outline" color="#888" />}
+            />
 
-      <TextInput
-        label="סיסמה"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-        style={styles.input}
-      />
+            <TextInput
+              label="סיסמה"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPassword}
+              mode="outlined"
+              style={styles.input}
+              outlineColor="transparent"
+              activeOutlineColor="#E91E63"
+              theme={{ roundness: 12 }}
+              left={<TextInput.Icon icon="lock-outline" color="#888" />}
+              right={
+                <TextInput.Icon
+                  icon={showPassword ? 'eye-off' : 'eye'}
+                  color="#888"
+                  onPress={() => setShowPassword(!showPassword)}
+                />
+              }
+            />
 
-      <Button mode="contained" onPress={handleLogin} disabled={busy}>
-        {busy ? 'מתחבר...' : 'התחבר'}
-      </Button>
-    </View>
+            <Button
+              mode="contained"
+              onPress={handleLogin}
+              loading={busy}
+              disabled={busy}
+              style={styles.loginBtn}
+              labelStyle={styles.loginBtnText}
+              contentStyle={{ height: 50 }}
+            >
+              התחברות
+            </Button>
+          </View>
+
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>עדיין אין לכם משתמש?</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Registration')}>
+              <Text style={styles.registerLink}>הירשמו עכשיו</Text>
+            </TouchableOpacity>
+          </View>
+
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 24, justifyContent: 'center' },
-  backBtn: { position: 'absolute', top: 60, left: 16, zIndex: 10 },
-  title: { fontSize: 28, fontWeight: 'bold', marginBottom: 24, textAlign: 'center' },
-  input: { marginBottom: 12 },
+  bg: {
+    flex: 1,
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(20, 10, 30, 0.4)', 
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    padding: 24,
+    paddingTop: 60,
+  },
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: 30,
+  },
+  // ✅ שינוי גודל הלוגו כאן
+  logo: {
+    width: 180,  // הוגדל מ-140
+    height: 180, // הוגדל מ-140
+  },
+  
+  card: {
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    borderRadius: 24,
+    paddingVertical: 32,
+    paddingHorizontal: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  title: {
+    fontSize: 26,
+    fontWeight: '800',
+    textAlign: 'center',
+    color: '#333',
+    marginBottom: 4,
+  },
+  subtitle: {
+    fontSize: 15,
+    textAlign: 'center',
+    color: '#666',
+    marginBottom: 24,
+  },
+  input: {
+    marginBottom: 16,
+    backgroundColor: '#fff',
+  },
+  loginBtn: {
+    marginTop: 8,
+    borderRadius: 50,
+    backgroundColor: '#E91E63',
+    shadowColor: '#E91E63',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  loginBtnText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    letterSpacing: 1,
+  },
+
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 40,
+    alignItems: 'center',
+  },
+  footerText: {
+    color: '#fff',
+    fontSize: 15,
+    marginRight: 6,
+  },
+  registerLink: {
+    color: '#FF80AB',
+    fontSize: 15,
+    fontWeight: 'bold',
+    textDecorationLine: 'underline',
+  },
 });

@@ -1,44 +1,144 @@
 // comp/Welcome/WelcomeScreen.jsx
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { 
+  View, 
+  Text, 
+  TouchableOpacity, 
+  StyleSheet, 
+  Dimensions, 
+  Animated 
+} from 'react-native';
+import { useVideoPlayer, VideoView } from 'expo-video';
+import { LinearGradient } from 'expo-linear-gradient';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { StatusBar } from 'expo-status-bar';
 
-const W = Math.min(520, Math.max(320, Math.round(Dimensions.get('window').width - 40)));
+// ייבוא הלוגו המונפש שלך (ודא שהנתיב נכון)
+import AnimatedLogo from '../Settings/AnimatedLogo'; 
+
+const { width } = Dimensions.get('window');
+
+// --- רכיב רקע וידאו ---
+// --- רכיב רקע וידאו עם expo-video ---
+const bgSource = require('../../assets/images/game_mode_select_bg3.mp4');
+
+const LiveBackground = () => {
+  const player = useVideoPlayer(bgSource, (playerInstance) => {
+    playerInstance.loop = true;   // לולאה
+    playerInstance.muted = true;  // מיוט
+    playerInstance.play();        // הפעלה אוטומטית
+  });
+
+  return (
+    <View style={StyleSheet.absoluteFill}>
+      <VideoView
+        style={StyleSheet.absoluteFill}
+        player={player}
+        contentFit="cover" // כמו resizeMode="cover"
+      />
+      {/* שכבת כהות כדי שהטקסט יהיה קריא וברור */}
+      <View
+        style={[
+          StyleSheet.absoluteFill,
+          { backgroundColor: 'rgba(11, 16, 32, 0.75)' },
+        ]}
+      />
+    </View>
+  );
+};
+
 
 export default function WelcomeScreen({ navigation }) {
+  // אנימציית כניסה לכפתורים (עולים מלמטה)
+  const slideAnim = useRef(new Animated.Value(50)).current; 
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        friction: 6,
+        tension: 40,
+        useNativeDriver: true,
+      })
+    ]).start();
+  }, []);
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Love Game</Text>
-      <Text style={styles.subtitle}>בחר איך להמשיך</Text>
+      <StatusBar style="light" />
+      
+      {/* רקע חי */}
+      <LiveBackground />
 
-      <View style={styles.cardsRow}>
-        {/* משתמש רשום */}
-        <TouchableOpacity
-          style={styles.card}
-          onPress={() => navigation.navigate('Login')}
-        >
-          <Text style={styles.cardIcon}>👤</Text>
-          <Text style={styles.cardTitle}>אני משתמש רשום</Text>
-          <Text style={styles.cardText}>
-            כניסה עם משתמש קיים
-          </Text>
-        </TouchableOpacity>
+      <View style={styles.contentContainer}>
+        
+        {/* --- חלק עליון: לוגו + LIBA + סלוגן במרכז המסך --- */}
+        <View style={styles.headerSection}>
+          <View style={styles.logoWrapper}>
+            <AnimatedLogo style={styles.logo} />
+          </View>
+          
+          <Text style={styles.appName}>Liba</Text>
+          <Text style={styles.tagline}>להכיר. להתחבר. לאהוב.</Text>
+        </View>
 
-        {/* משתמש חדש */}
-        <TouchableOpacity
-          style={styles.card}
-          onPress={() => navigation.navigate('Registration')}
+        {/* --- חלק תחתון: שני הכפתורים --- */}
+        <Animated.View 
+          style={[
+            styles.buttonsContainer, 
+            { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
+          ]}
         >
-          <Text style={styles.cardIcon}>✨</Text>
-          <Text style={styles.cardTitle}>אני משתמש חדש</Text>
-          <Text style={styles.cardText}>
-            יצירת משתמש חדש ורישום
-          </Text>
-        </TouchableOpacity>
+          <Text style={styles.chooseText}>ברוכים הבאים, איך נתחיל?</Text>
+
+          <View style={styles.cardsRow}>
+            
+            {/* כפתור ימני: משתמש קיים (התחברות) */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={styles.cardWrapper}
+              onPress={() => navigation.navigate('Login')}
+            >
+              <LinearGradient
+                colors={['rgba(34, 197, 94, 0.15)', 'rgba(34, 197, 94, 0.05)']}
+                style={styles.cardGradient}
+              >
+                <View style={[styles.iconCircle, { borderColor: '#4ade80' }]}>
+                  <MaterialCommunityIcons name="login-variant" size={32} color="#4ade80" />
+                </View>
+                <Text style={styles.cardTitle}>התחברות</Text>
+                <Text style={styles.cardSubtitle}>יש לי כבר חשבון</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            {/* כפתור שמאלי: משתמש חדש (הרשמה) */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={styles.cardWrapper}
+              onPress={() => navigation.navigate('Registration')}
+            >
+              <LinearGradient
+                colors={['rgba(236, 72, 153, 0.15)', 'rgba(236, 72, 153, 0.05)']} 
+                style={styles.cardGradient}
+              >
+                <View style={[styles.iconCircle, { borderColor: '#f472b6' }]}>
+                  <MaterialCommunityIcons name="account-plus-outline" size={32} color="#f472b6" />
+                </View>
+                <Text style={styles.cardTitle}>הרשמה</Text>
+                <Text style={styles.cardSubtitle}>משתמש חדש</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+          </View>
+        </Animated.View>
+
       </View>
-
-      <Text style={styles.helper}>
-        אם כבר התחברת בעבר ולא התנתקת, תיכנס אוטומטית לבחירת סגנון משחק.
-      </Text>
     </View>
   );
 }
@@ -47,59 +147,106 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0b1020',
+  },
+
+  // במקום space-between: נותנים ל-header flex:1 כדי למרכז אותו אנכית
+  contentContainer: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+    paddingTop: 40,
+  },
+  
+  // --- חלק עליון: לוגו + שם + סלוגן במרכז המסך ---
+  headerSection: {
+    flex: 1,                  // 👈 זה נותן לחלק העליון "תפיסת גובה"
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 16,
+    justifyContent: 'center', // 👈 מרכז את הלוגו + LIBA + סלוגן אנכית
   },
-  title: {
-    fontSize: 32,
+  logoWrapper: {
+    shadowColor: '#ffffff',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+  },
+  logo: {
+    width: 150,
+    height: 150,
+  },
+  appName: {
+    fontSize: 52,
+    fontWeight: '800',
     color: '#ffffff',
-    fontWeight: 'bold',
-    marginBottom: 8,
-    textAlign: 'center',
+    marginTop: 15,
+    letterSpacing: 2,
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 4 },
+    textShadowRadius: 10,
   },
-  subtitle: {
-    fontSize: 16,
-    color: '#cfd8dc',
-    marginBottom: 32,
+  tagline: {
+    fontSize: 18,
+    color: '#cbd5e1',
+    marginTop: 5,
+    fontWeight: '500',
+    letterSpacing: 1,
+    opacity: 0.9,
+  },
+  
+  // --- חלק תחתון: כפתורים ---
+  buttonsContainer: {
+    width: '100%',
+    marginBottom: 10, // קצת מרווח מהקצה התחתון
+  },
+  chooseText: {
+    color: '#94a3b8',
     textAlign: 'center',
+    marginBottom: 20,
+    fontSize: 15,
+    fontWeight: '500',
   },
   cardsRow: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse', // "התחברות" מימין
     justifyContent: 'space-between',
-    width: W,
-    marginBottom: 24,
   },
-  card: {
+  cardWrapper: {
+    width: '48%',
+    aspectRatio: 0.8,
+    borderRadius: 24,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  cardGradient: {
     flex: 1,
-    marginHorizontal: 6,
-    borderRadius: 18,
-    backgroundColor: '#1c2540',
-    paddingVertical: 18,
-    paddingHorizontal: 10,
     alignItems: 'center',
+    justifyContent: 'center',
+    padding: 10,
   },
-  cardIcon: {
-    fontSize: 32,
-    marginBottom: 10,
+  iconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 15,
+    backgroundColor: 'rgba(0,0,0,0.2)',
   },
   cardTitle: {
-    fontSize: 16,
+    fontSize: 20,
+    fontWeight: '700',
     color: '#ffffff',
-    fontWeight: '600',
-    marginBottom: 4,
-    textAlign: 'center',
+    marginBottom: 6,
   },
-  cardText: {
-    fontSize: 13,
-    color: '#b0bec5',
+  cardSubtitle: {
+    fontSize: 14,
+    color: '#cbd5e1',
+    opacity: 0.8,
     textAlign: 'center',
-  },
-  helper: {
-    fontSize: 12,
-    color: '#90a4ae',
-    marginTop: 8,
-    textAlign: 'center',
-    paddingHorizontal: 24,
   },
 });

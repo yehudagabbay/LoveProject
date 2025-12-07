@@ -22,7 +22,7 @@ import {
   PanResponder,
   TextInput,
 } from 'react-native';
-import { LogoutButton } from '../Settings/Settings';
+// ❌ הוסר LogoutButton
 import logo1 from '../../assets/images/logo1.png';
 
 // אייקונים
@@ -741,14 +741,6 @@ export default function IndexGame({ route, navigation }) {
           </View>
         </Pressable>
       </Modal>
-
-      <View style={styles.footerRow}>
-        <LogoutButton
-          navigation={navigation}
-          style={styles.logoutBtn}
-          textStyle={styles.logoutText}
-        />
-      </View>
     </View>
   );
 }
@@ -1157,18 +1149,5 @@ const styles = StyleSheet.create({
   feedbackBtnText: {
     color: '#fff',
     fontWeight: 'bold',
-  },
-  footerRow: {
-    width: '100%',
-    padding: 10,
-    alignItems: 'center',
-  },
-  logoutBtn: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-  },
-  logoutText: {
-    color: '#ff6b6b',
-    fontWeight: '600',
   },
 });

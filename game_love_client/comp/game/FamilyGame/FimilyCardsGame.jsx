@@ -12,7 +12,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   Dimensions,
-  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -21,7 +20,7 @@ import {
   Image,
   PanResponder,
   TextInput
-} from 'react-native';
+} from 'react-native'; // ✅ הסרתי את Alert
 import { LogoutButton } from '../../Settings/Settings';
 import logo1 from '../../../assets/images/logo1.png';
 
@@ -117,6 +116,37 @@ export default function FamilyCardsGame({ route, navigation }) {
   const flyOutAnim = useRef(new Animated.Value(0)).current;
   const pan = useRef(new Animated.ValueXY()).current;
 
+  // ✅ התראות מותאמות (מידע / שגיאה)
+  const [inlineAlertVisible, setInlineAlertVisible] = useState(false);
+  const [inlineAlertMessage, setInlineAlertMessage] = useState('');
+  const [inlineAlertType, setInlineAlertType] = useState('info'); // 'info' | 'error'
+  const inlineAlertTimeoutRef = useRef(null);
+
+  // ✅ פונקציה להצגת התראה
+  const showInlineAlert = (message, type = 'info') => {
+    setInlineAlertMessage(message);
+    setInlineAlertType(type);
+    setInlineAlertVisible(true);
+
+    if (inlineAlertTimeoutRef.current) {
+      clearTimeout(inlineAlertTimeoutRef.current);
+    }
+
+    inlineAlertTimeoutRef.current = setTimeout(() => {
+      setInlineAlertVisible(false);
+      inlineAlertTimeoutRef.current = null;
+    }, 3200);
+  };
+
+  // ✅ ניקוי טיימר בעת יציאה מהמסך
+  useEffect(() => {
+    return () => {
+      if (inlineAlertTimeoutRef.current) {
+        clearTimeout(inlineAlertTimeoutRef.current);
+      }
+    };
+  }, []);
+
   useEffect(() => {
     Animated.sequence([
       Animated.delay(100),
@@ -190,19 +220,10 @@ export default function FamilyCardsGame({ route, navigation }) {
 
   const handleDrawPress = () => {
     if (remainingCount === 0) {
-      Alert.alert(
-        'נגמרו הקלפים',
-        'שיחקתם בכל הקלפים. חזרו לבחירת קלפים למשחק משפחתי חדש.',
-        [
-          {
-            text: 'לבחירת קלפים',
-            onPress: () =>
-              navigation.navigate('FamilyCardsSelect', {
-                userId: getCurrentUserId(route),
-              }),
-          },
-          { text: 'סגור', style: 'cancel' },
-        ],
+      // ✅ במקום Alert.alert – התראת מידע רכה
+      showInlineAlert(
+        'נגמרו הקלפים בחפיסה. ניתן לבחור קלפים חדשים במסך "בחירת קלפים".',
+        'info',
       );
       return;
     }
@@ -261,7 +282,8 @@ export default function FamilyCardsGame({ route, navigation }) {
     if (!currentCardId) return;
     const userId = getCurrentUserId(route);
     if (!userId || userId <= 0) {
-      Alert.alert('שגיאה', 'לא נמצא משתמש מחובר לשליחת משוב.');
+      // ✅ התראת שגיאה במקום Alert.alert
+      showInlineAlert('לא נמצא משתמש מחובר לשליחת משוב.', 'error');
       return;
     }
     setFeedbackText('');
@@ -279,11 +301,13 @@ export default function FamilyCardsGame({ route, navigation }) {
     if (!card) return;
     const userId = getCurrentUserId(route);
     if (!userId || userId <= 0) {
-      Alert.alert('שגיאה', 'לא נמצא משתמש מחובר.');
+      // ✅ שגיאה – אין משתמש
+      showInlineAlert('לא נמצא משתמש מחובר.', 'error');
       return;
     }
     if (!feedbackText.trim()) {
-      Alert.alert('משוב חסר', 'כתבו כמה מילים לפני שליחת המשוב.');
+      // ✅ מידע – חסר טקסט
+      showInlineAlert('כתבו כמה מילים לפני שליחת המשוב.', 'info');
       return;
     }
 
@@ -302,10 +326,13 @@ export default function FamilyCardsGame({ route, navigation }) {
         body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error('Status not OK');
-      Alert.alert('תודה!', 'המשוב נשלח בהצלחה.');
+
+      // ✅ מידע – משוב נשלח בהצלחה
+      showInlineAlert('תודה! המשוב נשלח בהצלחה.', 'info');
       closeFeedbackModal();
     } catch (err) {
-      Alert.alert('שגיאה', 'לא ניתן היה לשלוח את המשוב כרגע.');
+      // ✅ שגיאה – לא נשלח
+      showInlineAlert('לא ניתן היה לשלוח את המשוב כרגע.', 'error');
     } finally {
       setSendingFeedback(false);
     }
@@ -351,6 +378,20 @@ export default function FamilyCardsGame({ route, navigation }) {
 
   return (
     <View style={styles.screen}>
+      {/* ✅ פס התראה עליון – מידע / שגיאה */}
+      {inlineAlertVisible && (
+        <View
+          style={[
+            styles.inlineAlert,
+            inlineAlertType === 'error'
+              ? styles.inlineAlertError
+              : styles.inlineAlertInfo,
+          ]}
+        >
+          <Text style={styles.inlineAlertText}>{inlineAlertMessage}</Text>
+        </View>
+      )}
+
       {/* כותרת עליונה */}
       <View style={styles.header}>
         <Text style={styles.gameTitle}>משחק משפחה</Text>
@@ -787,6 +828,34 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+
+  // ✅ סגנון להתראות העליונות
+  inlineAlert: {
+    position: 'absolute',
+    top: 20,
+    left: 16,
+    right: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 50,
+    elevation: 10,
+  },
+  inlineAlertInfo: {
+    backgroundColor: '#DBEAFE', // כחול עדין
+  },
+  inlineAlertError: {
+    backgroundColor: '#FEE2E2', // אדום עדין
+  },
+  inlineAlertText: {
+    color: '#111827',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+
   header: {
     paddingTop: 40,
     paddingBottom: 10,
