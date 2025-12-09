@@ -1,168 +1,390 @@
-import React, { useState } from 'react';
+// comp/game/FamilyGame/FamilyCardsSelect.jsx
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   StyleSheet,
-  ScrollView,
   Dimensions,
-  Image,
+  ActivityIndicator,
   Alert,
+  TextInput,
+  ScrollView,
   KeyboardAvoidingView,
-  Platform
+  Platform,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as SecureStore from 'expo-secure-store';
 import { StatusBar } from 'expo-status-bar';
+import AnimatedLogo from '../../Settings/AnimatedLogo';
+import TopMenu from '../../Settings/TopMenu';
 
-// --- רכיבים חיצוניים ---
-import TopMenu from '../../Settings/TopMenu'; // ✅ התפריט החדש
-
-const { width } = Dimensions.get('window');
-
-// נתונים סטטיים לקטגוריות (בהתאם לתמונה)
-const CATEGORIES = [
-  {
-    id: 1,
-    title: 'היכרות משפחתית',
-    subtitle: 'שאלות לשבירת קרח וחיבור בין כל בני הבית',
-    color: '#10B981', // Green
-    icon: 'account-group',
-    stars: 1,
-  },
-  {
-    id: 2,
-    title: 'כיף וצחוקים',
-    subtitle: 'אתגרים קלילים שיעלו צחוק לגדולים ולקטנים',
-    color: '#F59E0B', // Orange
-    icon: 'emoticon-lol-outline',
-    stars: 2,
-  },
-  {
-    id: 3,
-    title: 'גיבוש משפחתי',
-    subtitle: 'קלפים שמחזקים שיתוף פעולה ותחושת ביחד',
-    color: '#6366F1', // Indigo
-    icon: 'handshake-outline',
-    stars: 3,
-  },
+// ───────────────────────────────────────────────────────────────
+// כתובות API (HTTP + HTTPS)
+// ───────────────────────────────────────────────────────────────
+const API_BASES = [
+  'http://lovegame.somee.com/api',
+  'https://lovegame.somee.com/api',
 ];
 
-export default function FamilyCardsSelect({ navigation, route }) {
-  const userId = route?.params?.userId || 0;
-  
-  // ניהול שמות השחקנים (6 שדות כמו בתמונה)
-  const [players, setPlayers] = useState({
-    1: '', 2: '', 3: '', 4: '', 5: '', 6: ''
-  });
+const API_PATHS = [
+  'Users/get-selected-cards',
+  'users/get-selected-cards',
+];
 
-  // ניהול בחירת קטגוריות
-  const [selectedCats, setSelectedCats] = useState([1, 2, 3]); // ברירת מחדל: הכל נבחר
+// ───────────────────────────────────────────────────────────────
+// הגדרות מזהים
+// ───────────────────────────────────────────────────────────────
+const CATEGORY_IDS = {
+  intro: 1, // היכרות משפחתית
+  fun: 2,   // כיף / צחוקים
+  team: 3,  // גיבוש משפחתי
+};
 
-  const toggleCategory = (id) => {
-    if (selectedCats.includes(id)) {
-      setSelectedCats(selectedCats.filter((c) => c !== id));
+const DEFAULT_COUNT_PER_CAT = 5;
+// ⚠️ ודא שזה אותו ModeID שהגדרת למשחק משפחה בטבלה
+const CURRENT_MODE_ID = 3; // משפחה
+
+// חישוב מידות מסך
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const ROW_W = Math.min(520, Math.max(320, Math.round(SCREEN_WIDTH - 40)));
+
+// ───────────────────────────────────────────────────────────────
+// בקשת כרטיסים מהשרת
+// ───────────────────────────────────────────────────────────────
+async function fetchSelectedCards(selections) {
+  let lastErr = null;
+
+  console.log(
+    '📤 [FamilyCardsSelect] selections payload:',
+    JSON.stringify({ Selections: selections }, null, 2),
+  );
+
+  for (const base of API_BASES) {
+    for (const path of API_PATHS) {
+      const url = `${base}/${path}`;
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          body: JSON.stringify({ Selections: selections }),
+          signal: controller.signal,
+        });
+
+        const raw = await res.text();
+        clearTimeout(timeoutId);
+
+        let data = null;
+        try {
+          data = raw ? JSON.parse(raw) : null;
+        } catch (e) {
+          console.log('⚠️ JSON parse error (family):', e.message);
+        }
+
+        if (res.ok) {
+          return data;
+        }
+
+        const lowerRaw = (raw || '').toLowerCase();
+        if (
+          res.status === 404 ||
+          lowerRaw.includes('no cards found')
+        ) {
+          return { notFound: true };
+        }
+
+        const msg = data?.message || data?.error || `HTTP ${res.status}`;
+        throw new Error(msg);
+      } catch (e) {
+        clearTimeout(timeoutId);
+        lastErr = e;
+      }
+    }
+  }
+
+  throw lastErr || new Error('Network/API unreachable');
+}
+
+// ───────────────────────────────────────────────────────────────
+// קומפוננטת כוכבים (בחירת רמת קושי)
+// ───────────────────────────────────────────────────────────────
+const Stars = ({ selectedLevels, onChange, color }) => {
+  const toggleLevel = (lvl) => {
+    if (selectedLevels.includes(lvl)) {
+      onChange(selectedLevels.filter((x) => x !== lvl));
     } else {
-      setSelectedCats([...selectedCats, id]);
+      onChange([...selectedLevels, lvl].sort());
     }
   };
 
-  const updatePlayerName = (id, text) => {
-    setPlayers((prev) => ({ ...prev, [id]: text }));
-  };
+  const selectAll = () => onChange([1, 2, 3]);
+  const clearAll = () => onChange([]);
 
-  const handleStartGame = () => {
-    // 1. סינון שחקנים ריקים
-    const activePlayers = Object.values(players).filter(p => p.trim().length > 0);
+  return (
+    <View style={styles.starsContainer}>
+      <View style={styles.starsRow}>
+        {[1, 2, 3].map((i) => {
+          const active = selectedLevels.includes(i);
+          return (
+            <TouchableOpacity
+              key={i}
+              onPress={() => toggleLevel(i)}
+              activeOpacity={0.7}
+              style={[
+                styles.starBtn,
+                active && {
+                  backgroundColor: color + '20',
+                  borderColor: color,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.starText,
+                  active ? { color: color } : { color: '#C4C4C4' },
+                ]}
+              >
+                {active ? '★' : '☆'}
+              </Text>
+              <Text
+                style={[
+                  styles.levelNum,
+                  { color: active ? color : '#999' },
+                ]}
+              >
+                {i}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
 
-    // בדיקות תקינות
-    if (activePlayers.length < 2) {
-      Alert.alert('רגע...', 'יש להזין לפחות שני שמות של משתתפים כדי להתחיל.');
+      <TouchableOpacity
+        onPress={selectedLevels.length > 0 ? clearAll : selectAll}
+        style={styles.miniActionBtn}
+      >
+        <Text style={styles.miniActionText}>
+          {selectedLevels.length > 0 ? 'נקה' : 'בחר הכל'}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
+
+// ───────────────────────────────────────────────────────────────
+// כרטיס קטגוריה
+// ───────────────────────────────────────────────────────────────
+const CategoryCard = ({
+  title,
+  icon,
+  selectedLevels,
+  onChange,
+  color,
+  description,
+}) => (
+  <View style={[styles.card, { borderLeftColor: color, borderLeftWidth: 6 }]}>
+    <View style={styles.cardHeader}>
+      <Text style={styles.cardIcon}>{icon}</Text>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.cardTitle}>{title}</Text>
+        <Text style={styles.cardDesc}>{description}</Text>
+      </View>
+    </View>
+
+    <View style={styles.divider} />
+    <Stars selectedLevels={selectedLevels} onChange={onChange} color={color} />
+  </View>
+);
+
+// ───────────────────────────────────────────────────────────────
+// FamilyCardsSelect – מסך ראשי
+// ───────────────────────────────────────────────────────────────
+export default function FamilyCardsSelect({ navigation, route }) {
+  const [userId, setUserId] = useState(route?.params?.userId ?? null);
+
+  // רמות לכל קטגוריה
+  const [introLevels, setIntroLevels] = useState([]);
+  const [funLevels, setFunLevels] = useState([]);
+  const [teamLevels, setTeamLevels] = useState([]);
+
+  const [busy, setBusy] = useState(false);
+
+  // עד 6 שחקנים
+  const [player1Name, setPlayer1Name] = useState('');
+  const [player2Name, setPlayer2Name] = useState('');
+  const [player3Name, setPlayer3Name] = useState('');
+  const [player4Name, setPlayer4Name] = useState('');
+  const [player5Name, setPlayer5Name] = useState('');
+  const [player6Name, setPlayer6Name] = useState('');
+
+  // טעינת userId
+  useEffect(() => {
+    (async () => {
+      if (!userId) {
+        const saved = await SecureStore.getItemAsync('lg_userId');
+        if (saved) {
+          setUserId(saved);
+        }
+      }
+    })();
+  }, [userId]);
+
+  const startGame = async () => {
+    if (!userId) {
+      Alert.alert('שגיאה', 'חסר מזהה משתמש.');
       return;
     }
 
-    if (selectedCats.length === 0) {
-      Alert.alert('שגיאה', 'יש לבחור לפחות קטגוריה אחת.');
+    const selections = [];
+
+    const addCategory = (catId, levelsArr) => {
+      levelsArr.forEach((lvl) =>
+        selections.push({
+          ModeID: CURRENT_MODE_ID,
+          CategoryID: catId,
+          LevelID: lvl,
+          NumberOfCards: DEFAULT_COUNT_PER_CAT,
+        }),
+      );
+    };
+
+    if (introLevels.length) addCategory(CATEGORY_IDS.intro, introLevels);
+    if (funLevels.length) addCategory(CATEGORY_IDS.fun, funLevels);
+    if (teamLevels.length) addCategory(CATEGORY_IDS.team, teamLevels);
+
+    if (selections.length === 0) {
+      Alert.alert(
+        'רגע אחד',
+        'יש לבחור לפחות סוג אחד של קלפים (לסמן כוכבים).',
+      );
       return;
     }
 
-    // 2. הכנת הקלפים (סימולציה - כאן היית שולף מה-DB או מסנן מערך קיים)
-    // לצורך הדוגמה אני יוצר קלפים דמה, בפועל תשלח את ה-IDs לשרת או תסנן רשימה מקומית
-    const dummyCards = []; 
-    // ... לוגיקת שליפת קלפים לפי selectedCats ...
-    // כאן נניח שאנחנו מעבירים רשימה ריקה והמשחק יטפל בזה, 
-    // או שתעביר את הקלפים האמיתיים מה-DB שלך.
-    // בדוגמה זו אני מעביר מערך דמה כדי שהמשחק לא יקרוס:
-    for(let i=0; i<30; i++) {
-        dummyCards.push({ id: i, categoryID: (i % 3) + 1, levelID: (i % 3) + 1, description: 'שאלה לדוגמה...' });
+    const names = [
+      player1Name?.trim(),
+      player2Name?.trim(),
+      player3Name?.trim(),
+      player4Name?.trim(),
+      player5Name?.trim(),
+      player6Name?.trim(),
+    ];
+
+    const players = names.filter((n) => n && n.length > 0);
+
+    // ✅ למשפחה חייבים לפחות שני שמות
+    if (players.length < 2) {
+      Alert.alert(
+        'רגע אחד',
+        'במשחק משפחתי יש למלא לפחות שני שמות של שחקנים/יות.',
+      );
+      return;
     }
 
-    // 3. ניווט למשחק
-    navigation.navigate('FamilyCardsGame', {
-      userId,
-      players: activePlayers,
-      cards: dummyCards, // בפועל: CardsData.filter(...)
-    });
+    setBusy(true);
+    try {
+      const cards = await fetchSelectedCards(selections);
+
+      if (cards && cards.notFound) {
+        Alert.alert(
+          'אופס',
+          'לא נמצאו קלפים מתאימים לבחירה הזו.\nנסה לשנות קטגוריה או רמת קושי.',
+        );
+        return;
+      }
+
+      if (!Array.isArray(cards) || cards.length === 0) {
+        Alert.alert('אופס', 'לא נמצאו קלפים.');
+        return;
+      }
+
+      navigation.navigate('FamilyCardsGame', {
+        userId,
+        gameMode: 'family',
+        selection: {
+          intro: introLevels,
+          fun: funLevels,
+          team: teamLevels,
+        },
+        cards,
+        players,
+      });
+    } catch (e) {
+      console.log('🚨 startGame (family) error:', e?.message);
+      Alert.alert('שגיאה', e?.message || 'תקלה בהתחברות');
+    } finally {
+      setBusy(false);
+    }
   };
-  
+
   // --- ניווט מהתפריט ---
   const handleMenuLogout = () => {
     navigation.reset({ index: 0, routes: [{ name: 'Welcome' }] });
   };
-
   const showInfo = (msg) => Alert.alert('מידע', msg);
 
   return (
-    <View style={styles.container}>
+    <View style={styles.mainContainer}>
       <StatusBar style="dark" />
-      
-      {/* ✅ תפריט עליון */}
+
+      {/* תפריט עליון */}
       <TopMenu
         navigation={navigation}
         onSelectCoupleCards={() => navigation.navigate('GameModeSelect')}
-        onSelectFamilyCards={() => {}} // כבר כאן
-        onSelectFriendsCards={() => navigation.navigate('FriendsCardsSelect', { userId })}
+        onSelectFamilyCards={() => {}} // אנחנו כבר כאן
+        onSelectFriendsCards={() =>
+          navigation.navigate('FriendsCardsSelect', { userId })
+        }
         onContact={() => showInfo('צור קשר - בקרוב')}
         onFeedback={() => showInfo('פידבק - בקרוב')}
         onHelp={() => showInfo('עזרה - בקרוב')}
         onLogout={handleMenuLogout}
       />
 
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      <AnimatedLogo style={styles.backgroundLogo} />
+
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
       >
-        <ScrollView 
+        <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          
           {/* כותרת */}
           <View style={styles.headerContainer}>
-            <Text style={styles.headerTitle}>בחירת משחק – משפחה</Text>
-            <Text style={styles.headerSubtitle}>
+            <Text style={styles.mainTitle}>בחירת משחק – משפחה</Text>
+            <Text style={styles.subTitle}>
               בחרו את סוג הקלפים למשחק משפחתי והכניסו את שמות המשתתפים
             </Text>
           </View>
 
-          {/* אזור הזנת שמות */}
-          <View style={styles.playersCard}>
-            <Text style={styles.playersTitle}>מי משתתף במשחק? (הורים, ילדים, סבים...)</Text>
-            
-            <View style={styles.inputsGrid}>
-              {[1, 2, 3, 4, 5, 6].map((num) => (
-                <View key={num} style={styles.inputWrapper}>
-                  <View style={styles.labelRow}>
-                    <MaterialCommunityIcons name="account" size={14} color="#2563EB" />
-                    <Text style={styles.inputLabel}>שחקן/ית {num}</Text>
-                  </View>
+          {/* שמות משתתפים */}
+          <View style={styles.playersSectionFriends}>
+            <Text style={styles.playersTitle}>מי משתתף במשחק?</Text>
+
+            <View style={styles.playersGrid}>
+              {[
+                { label: 'שחקן/ית 1', val: player1Name, set: setPlayer1Name },
+                { label: 'שחקן/ית 2', val: player2Name, set: setPlayer2Name },
+                { label: 'שחקן/ית 3', val: player3Name, set: setPlayer3Name },
+                { label: 'שחקן/ית 4', val: player4Name, set: setPlayer4Name },
+                { label: 'שחקן/ית 5', val: player5Name, set: setPlayer5Name },
+                { label: 'שחקן/ית 6', val: player6Name, set: setPlayer6Name },
+              ].map((p, idx) => (
+                <View key={idx} style={styles.playerInputBox}>
+                  <Text style={styles.inputLabel}>{p.label}</Text>
                   <TextInput
-                    style={styles.textInput}
+                    style={styles.modernInput}
                     placeholder="שם..."
+                    value={p.val}
+                    onChangeText={p.set}
                     placeholderTextColor="#9CA3AF"
-                    value={players[num]}
-                    onChangeText={(text) => updatePlayerName(num, text)}
                     textAlign="right"
                   />
                 </View>
@@ -170,262 +392,258 @@ export default function FamilyCardsSelect({ navigation, route }) {
             </View>
           </View>
 
-          {/* רשימת קטגוריות */}
-          <View style={styles.categoriesContainer}>
-            {CATEGORIES.map((cat) => {
-              const isSelected = selectedCats.includes(cat.id);
-              return (
-                <TouchableOpacity
-                  key={cat.id}
-                  activeOpacity={0.9}
-                  onPress={() => toggleCategory(cat.id)}
-                  style={[
-                    styles.catCard,
-                    { borderLeftColor: cat.color } // הפס הצבעוני בצד
-                  ]}
-                >
-                  <View style={styles.catContent}>
-                    <View style={styles.catHeader}>
-                      <View style={styles.iconBox}>
-                        <MaterialCommunityIcons name={cat.icon} size={28} color="#374151" />
-                      </View>
-                      <View style={{ flex: 1, paddingHorizontal: 10 }}>
-                        <Text style={styles.catTitle}>{cat.title}</Text>
-                        <Text style={styles.catSubtitle}>{cat.subtitle}</Text>
-                      </View>
-                    </View>
+          {/* כרטיסי קטגוריות */}
+          <View style={styles.cardsContainer}>
+            <CategoryCard
+              title="היכרות משפחתית"
+              description="שאלות לשבירת קרח וחיבור בין כל בני הבית"
+              icon="👨‍👩‍👧‍👦"
+              color="#10B981"
+              selectedLevels={introLevels}
+              onChange={setIntroLevels}
+            />
 
-                    <View style={styles.catFooter}>
-                      <View style={styles.starsRow}>
-                        {[...Array(3)].map((_, i) => (
-                          <MaterialCommunityIcons
-                            key={i}
-                            name={i < cat.stars ? "star" : "star-outline"}
-                            size={18}
-                            color="#9CA3AF"
-                          />
-                        ))}
-                      </View>
+            <CategoryCard
+              title="כיף וצחוקים"
+              description="אתגרים קלילים שיעלו צחוק לגדולים ולקטנים"
+              icon="😄"
+              color="#F59E0B"
+              selectedLevels={funLevels}
+              onChange={setFunLevels}
+            />
 
-                      <TouchableOpacity 
-                        style={[
-                            styles.selectBtn, 
-                            isSelected ? styles.btnSelected : styles.btnUnselected
-                        ]}
-                        onPress={() => toggleCategory(cat.id)}
-                      >
-                        <Text style={[
-                            styles.selectBtnText,
-                            isSelected ? { color: '#fff' } : { color: '#6B7280' }
-                        ]}>
-                            {isSelected ? 'נבחר ✓' : 'בחר'}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
+            <CategoryCard
+              title="גיבוש משפחתי"
+              description="קלפים שמחזקים שיתוף פעולה ותחושת ביחד"
+              icon="🏠"
+              color="#6366F1"
+              selectedLevels={teamLevels}
+              onChange={setTeamLevels}
+            />
           </View>
-        
-          <View style={{ height: 100 }} /> 
+
+          {/* כפתור התחלה */}
+          <TouchableOpacity
+            style={[styles.playButton, busy && styles.playButtonDisabled]}
+            onPress={startGame}
+            disabled={busy}
+            activeOpacity={0.8}
+          >
+            {busy ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <Text style={styles.playButtonText}>מתחילים לשחק</Text>
+                <Text style={styles.playButtonIcon}>🚀</Text>
+              </>
+            )}
+          </TouchableOpacity>
+
+          <View style={{ height: 60 }} />
         </ScrollView>
       </KeyboardAvoidingView>
-
-      {/* כפתור התחלה צף למטה */}
-      <View style={styles.bottomBar}>
-        <TouchableOpacity style={styles.startBtn} onPress={handleStartGame}>
-            <LinearGradient
-                colors={['#4F46E5', '#3B82F6']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.gradientBtn}
-            >
-                <Text style={styles.startBtnText}>התחל משחק</Text>
-                <MaterialCommunityIcons name="arrow-left" size={20} color="#fff" />
-            </LinearGradient>
-        </TouchableOpacity>
-      </View>
     </View>
   );
 }
 
+// ───────────────────────────────────────────────────────────────
+// עיצוב
+// ───────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: {
+  mainContainer: {
     flex: 1,
-    backgroundColor: '#F3F4F6', // רקע אפור בהיר מאוד
+    backgroundColor: '#F3F4F6',
+  },
+  backgroundLogo: {
+    position: 'absolute',
+    top: SCREEN_HEIGHT * 0.15,
+    alignSelf: 'center',
+    width: SCREEN_WIDTH * 0.9,
+    height: SCREEN_WIDTH * 0.9,
+    opacity: 0.1,
   },
   scrollContent: {
-    paddingTop: 80, // מקום לתפריט העליון
+    paddingTop: 85,
     paddingHorizontal: 16,
     paddingBottom: 20,
+    alignItems: 'center',
   },
   headerContainer: {
+    marginBottom: 24,
     alignItems: 'center',
-    marginBottom: 20,
   },
-  headerTitle: {
-    fontSize: 26,
+  mainTitle: {
+    fontSize: 24,
     fontWeight: '800',
     color: '#1F2937',
-    marginBottom: 8,
-  },
-  headerSubtitle: {
-    fontSize: 15,
-    color: '#6B7280',
+    marginBottom: 6,
     textAlign: 'center',
-    maxWidth: '80%',
-    lineHeight: 20,
   },
-  // כרטיס שחקנים
-  playersCard: {
-    backgroundColor: '#fff',
+  subTitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
+    textAlign: 'center',
+    maxWidth: '90%',
+  },
+
+  playersSectionFriends: {
+    width: ROW_W,
+    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     padding: 20,
-    elevation: 3,
+    marginBottom: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 5,
-    marginBottom: 24,
+    elevation: 3,
   },
   playersTitle: {
     fontSize: 16,
     fontWeight: '700',
     color: '#374151',
+    marginBottom: 12,
     textAlign: 'center',
-    marginBottom: 16,
   },
-  inputsGrid: {
+  playersGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+    gap: 12,
   },
-  inputWrapper: {
-    width: '48%', // שתי עמודות
-    marginBottom: 12,
-  },
-  labelRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    marginBottom: 4,
-    gap: 4,
+  playerInputBox: {
+    width: '47%',
   },
   inputLabel: {
-    fontSize: 13,
-    color: '#4B5563',
+    fontSize: 12,
     fontWeight: '600',
+    color: '#4B5563',
+    marginBottom: 4,
+    textAlign: 'right',
   },
-  textInput: {
+  modernInput: {
     backgroundColor: '#F9FAFB',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
     borderRadius: 12,
+    paddingVertical: 10,
     paddingHorizontal: 12,
-    paddingVertical: 8,
     fontSize: 14,
     color: '#111827',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
-  // קטגוריות
-  categoriesContainer: {
-    gap: 16,
+
+  cardsContainer: {
+    width: ROW_W,
   },
-  catCard: {
+  card: {
     backgroundColor: '#fff',
     borderRadius: 16,
-    elevation: 2,
+    marginBottom: 16,
+    padding: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
-    borderLeftWidth: 6, // הפס הצבעוני
-    padding: 16,
+    elevation: 2,
   },
-  catContent: {
-    flex: 1,
-  },
-  catHeader: {
-    flexDirection: 'row-reverse', // כדי שהאייקון יהיה מימין והטקסט משמאל (או להיפך לפי העדפה, כאן RTL)
+  cardHeader: {
+    flexDirection: 'row-reverse',
     alignItems: 'flex-start',
+    marginBottom: 12,
+    gap: 12,
   },
-  iconBox: {
-    width: 48,
-    height: 48,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
+  cardIcon: {
+    fontSize: 28,
   },
-  catTitle: {
+  cardTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: '#111827',
     textAlign: 'right',
-    marginBottom: 4,
   },
-  catSubtitle: {
+  cardDesc: {
     fontSize: 13,
     color: '#6B7280',
+    marginTop: 2,
     textAlign: 'right',
     lineHeight: 18,
   },
-  catFooter: {
+  divider: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
+    marginVertical: 12,
+  },
+
+  starsContainer: {
     flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
-    paddingTop: 12,
   },
   starsRow: {
     flexDirection: 'row',
-    gap: 2,
+    gap: 8,
   },
-  selectBtn: {
+  starBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 44,
+    height: 50,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#fff',
+  },
+  starText: {
+    fontSize: 22,
+    lineHeight: 26,
+  },
+  levelNum: {
+    fontSize: 10,
+    marginTop: -2,
+    fontWeight: '700',
+  },
+  miniActionBtn: {
     paddingVertical: 6,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
+    backgroundColor: '#F9FAFB',
     borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
-  btnUnselected: {
-    backgroundColor: '#F3F4F6',
-  },
-  btnSelected: {
-    backgroundColor: '#10B981', // ירוק כשהוא נבחר
-  },
-  selectBtnText: {
-    fontSize: 13,
+  miniActionText: {
+    fontSize: 12,
+    color: '#6B7280',
     fontWeight: '600',
   },
-  // כפתור תחתון
-  bottomBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#fff',
+
+  playButton: {
+    width: ROW_W,
+    backgroundColor: '#4F46E5',
     paddingVertical: 16,
-    paddingHorizontal: 20,
-    elevation: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-  },
-  startBtn: {
-    width: '100%',
     borderRadius: 30,
-    overflow: 'hidden',
-  },
-  gradientBtn: {
-    paddingVertical: 16,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
+    marginTop: 10,
+    shadowColor: '#4F46E5',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
   },
-  startBtnText: {
+  playButtonDisabled: {
+    opacity: 0.7,
+    backgroundColor: '#9CA3AF',
+    shadowOpacity: 0,
+  },
+  playButtonText: {
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
+    marginRight: 8,
+  },
+  playButtonIcon: {
+    fontSize: 20,
   },
 });

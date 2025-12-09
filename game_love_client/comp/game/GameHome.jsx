@@ -7,7 +7,6 @@ import {
   StyleSheet,
   Dimensions,
   ActivityIndicator,
-  Alert,
   TextInput,
   ScrollView,
   KeyboardAvoidingView,
@@ -17,9 +16,11 @@ import * as SecureStore from 'expo-secure-store';
 import { StatusBar } from 'expo-status-bar';
 import AnimatedLogo from '../Settings/AnimatedLogo';
 import TopMenu from '../Settings/TopMenu';
+import CustomAlert from '../Settings/CustomAlert';
 
 // ───────────────────────────────────────────────────────────────
-// כתובות API (HTTP + HTTPS, ו-uppercase/lowercase של הנתיב)
+// API
+// ───────────────────────────────────────────────────────────────
 const API_BASES = [
   'http://lovegame.somee.com/api',
   'https://lovegame.somee.com/api',
@@ -32,21 +33,18 @@ const API_PATHS = [
 
 const CATEGORY_IDS = { intro: 1, fun: 2, passion: 3 };
 const DEFAULT_COUNT_PER_CAT = 5;
+const CURRENT_MODE_ID = 1; // מצב זוגי
 
-// מצב משחק למסך הזה: 1 = זוגי
-const CURRENT_MODE_ID = 1;
-
-// חישוב מידות מסך
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const ROW_W = Math.min(520, Math.max(320, Math.round(SCREEN_WIDTH - 40)));
 
-// ───────────────────────────────────────────────────────────────
-// בקשת כרטיסים מהשרת
-// ───────────────────────────────────────────────────────────────
 async function fetchSelectedCards(selections) {
   let lastErr;
 
-  console.log('📤 selections payload:', JSON.stringify({ Selections: selections }, null, 2));
+  console.log(
+    '📤 selections payload:',
+    JSON.stringify({ Selections: selections }, null, 2),
+  );
 
   for (const base of API_BASES) {
     for (const path of API_PATHS) {
@@ -110,7 +108,33 @@ export default function GameHome({ navigation, route }) {
   const [player1Name, setPlayer1Name] = useState('');
   const [player2Name, setPlayer2Name] = useState('');
 
-  // טעינת userId מ־SecureStore אם לא הגיע ב־route
+  // ✅ סטייט להתראות
+  const [alertConfig, setAlertConfig] = useState({
+    visible: false,
+    type: 'info', // success | error | info | warning
+    title: '',
+    message: '',
+    onOk: null,
+  });
+
+  const showAlert = (type, title, message, onOk = null) => {
+    console.log('🔔 showAlert:', { type, title, message }); // לעזור לך לבדוק
+    setAlertConfig({
+      visible: true,
+      type,
+      title,
+      message,
+      onOk,
+    });
+  };
+
+  const handleAlertClose = () => {
+    const cb = alertConfig.onOk;
+    setAlertConfig((prev) => ({ ...prev, visible: false }));
+    if (cb) cb();
+  };
+
+  // טוענים userId מ־SecureStore אם צריך
   useEffect(() => {
     (async () => {
       if (!userId) {
@@ -123,7 +147,7 @@ export default function GameHome({ navigation, route }) {
   }, [userId]);
 
   // ───────────────────────────────────────────────────────────────
-  // קומפוננטת כוכבים לכל קטגוריה
+  // קומפוננטת כוכבים
   // ───────────────────────────────────────────────────────────────
   const Stars = ({ selectedLevels, onChange, color }) => {
     const toggleLevel = (lvl) => {
@@ -189,7 +213,7 @@ export default function GameHome({ navigation, route }) {
   };
 
   // ───────────────────────────────────────────────────────────────
-  // כרטיס קטגוריה (היכרות / כיף / תשוקה)
+  // כרטיס קטגוריה
   // ───────────────────────────────────────────────────────────────
   const CategoryCard = ({
     title,
@@ -214,21 +238,25 @@ export default function GameHome({ navigation, route }) {
   );
 
   // ───────────────────────────────────────────────────────────────
-  // לחיצה על "מתחילים לשחק"
+  // "מתחילים לשחק"
   // ───────────────────────────────────────────────────────────────
   const goNext = async () => {
     if (!userId) {
-      Alert.alert('שגיאה', 'חסר מזהה משתמש.');
+      // אזהרה / שגיאה – אדום
+      showAlert(
+        'warning',
+        'שגיאה',
+        'חסר מזהה משתמש. התחברו מחדש ונסו שוב.',
+      );
       return;
     }
 
     const selections = [];
 
-    // מוסיפים ModeID לכל בחירה (מצב זוגי)
     const addCategory = (catId, levelsArr) => {
       levelsArr.forEach((lvl) =>
         selections.push({
-          ModeID: CURRENT_MODE_ID, // 1 = זוגי
+          ModeID: CURRENT_MODE_ID,
           CategoryID: catId,
           LevelID: lvl,
           NumberOfCards: DEFAULT_COUNT_PER_CAT,
@@ -241,7 +269,12 @@ export default function GameHome({ navigation, route }) {
     if (passionLevels.length) addCategory(CATEGORY_IDS.passion, passionLevels);
 
     if (selections.length === 0) {
-      Alert.alert('רגע אחד', 'יש לבחור לפחות סוג אחד של קלפים.');
+      // בחירת משחק בלי קלפים → אזהרה אדומה
+      showAlert(
+        'warning',
+        'רגע אחד',
+        'יש לבחור לפחות סוג אחד של קלפים לפני שמתחילים לשחק.',
+      );
       return;
     }
 
@@ -252,7 +285,12 @@ export default function GameHome({ navigation, route }) {
       const cards = await fetchSelectedCards(selections);
 
       if (!Array.isArray(cards) || cards.length === 0) {
-        Alert.alert('אופס', 'לא נמצאו קלפים.');
+        // מידע – ירוק
+        showAlert(
+          'info',
+          'אופס',
+          'לא נמצאו קלפים מתאימים לבחירה הזאת. נסו שילוב אחר של רמות/קטגוריות.',
+        );
         return;
       }
 
@@ -273,17 +311,24 @@ export default function GameHome({ navigation, route }) {
       });
     } catch (e) {
       console.log('🚨 goNext error:', e?.name, e?.message);
-      Alert.alert('שגיאה', e?.message || 'תקלה בהתחברות');
+      showAlert(
+        'warning',
+        'שגיאה',
+        e?.message || 'תקלה בהתחברות לשרת. נסו שוב בעוד כמה רגעים.',
+      );
     } finally {
       setBusy(false);
     }
   };
 
-  // --- ניווט מהתפריט ---
+  // --- תפריט עליון ---
   const handleMenuLogout = () => {
     navigation.reset({ index: 0, routes: [{ name: 'Welcome' }] });
   };
-  const showInfo = (msg) => Alert.alert('מידע', msg);
+
+  const showInfo = (msg) => {
+    showAlert('info', 'מידע', msg);
+  };
 
   // ───────────────────────────────────────────────────────────────
   // UI
@@ -291,20 +336,31 @@ export default function GameHome({ navigation, route }) {
   return (
     <View style={styles.mainContainer}>
       <StatusBar style="dark" />
-      
-      {/* תפריט עליון */}
+
+      {/* 🔔 התראה מעוצבת גלובלית */}
+      <CustomAlert
+        visible={alertConfig.visible}
+        type={alertConfig.type}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        onClose={handleAlertClose}
+      />
+
       <TopMenu
         navigation={navigation}
-        onSelectCoupleCards={() => {}} // אנחנו כבר כאן
-        onSelectFamilyCards={() => navigation.navigate('FamilyCardsSelect', { userId })}
-        onSelectFriendsCards={() => navigation.navigate('FriendsCardsSelect', { userId })}
+        onSelectCoupleCards={() => {}}
+        onSelectFamilyCards={() =>
+          navigation.navigate('FamilyCardsSelect', { userId })
+        }
+        onSelectFriendsCards={() =>
+          navigation.navigate('FriendsCardsSelect', { userId })
+        }
         onContact={() => showInfo('צור קשר - בקרוב')}
         onFeedback={() => showInfo('פידבק - בקרוב')}
         onHelp={() => showInfo('עזרה - בקרוב')}
         onLogout={handleMenuLogout}
       />
 
-      {/* לוגו אנימציה ברקע */}
       <AnimatedLogo style={styles.backgroundLogo} />
 
       <KeyboardAvoidingView
@@ -315,13 +371,11 @@ export default function GameHome({ navigation, route }) {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* כותרת */}
           <View style={styles.headerContainer}>
             <Text style={styles.mainTitle}>בונים את המשחק</Text>
             <Text style={styles.subTitle}>בחרו את האווירה להערב</Text>
           </View>
 
-          {/* שמות שחקנים */}
           <View style={styles.playersSection}>
             <View style={styles.inputWrapper}>
               <Text style={styles.inputLabel}>💙 שחקן/ית 1</Text>
@@ -352,7 +406,6 @@ export default function GameHome({ navigation, route }) {
             </View>
           </View>
 
-          {/* כרטיסי קטגוריות */}
           <CategoryCard
             title="היכרות וחיבור"
             description="שאלות עומק לשיחה אמיתית"
@@ -383,7 +436,6 @@ export default function GameHome({ navigation, route }) {
           <View style={{ height: 80 }} />
         </ScrollView>
 
-        {/* כפתור קבוע למטה – כמו במשחק משפחה */}
         <View style={styles.footerRow}>
           <TouchableOpacity
             style={[styles.playButton, busy && styles.playButtonDisabled]}
@@ -414,7 +466,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFF5F7',
   },
-
   backgroundLogo: {
     position: 'absolute',
     top: SCREEN_HEIGHT * 0.15,
@@ -423,23 +474,19 @@ const styles = StyleSheet.create({
     height: SCREEN_WIDTH * 0.9,
     opacity: 0.3,
   },
-
   contentWrapper: {
     flex: 1,
     justifyContent: 'space-between',
   },
-
   scrollContent: {
     alignItems: 'center',
-    paddingTop: 85, // מקום לתפריט העליון
+    paddingTop: 85,
     paddingHorizontal: 16,
   },
-
   headerContainer: {
     marginBottom: 24,
     alignItems: 'center',
   },
-
   mainTitle: {
     fontSize: 26,
     fontWeight: '800',
@@ -451,7 +498,6 @@ const styles = StyleSheet.create({
     color: '#666',
     fontWeight: '500',
   },
-
   playersSection: {
     flexDirection: 'row',
     width: ROW_W,
@@ -467,7 +513,6 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
-
   inputWrapper: {
     flex: 1,
   },
@@ -488,7 +533,6 @@ const styles = StyleSheet.create({
     color: '#333',
     textAlign: 'right',
   },
-
   vsBadge: {
     width: 30,
     height: 30,
@@ -504,7 +548,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 12,
   },
-
   card: {
     width: ROW_W,
     backgroundColor: '#fff',
@@ -543,7 +586,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0F0F0',
     marginVertical: 10,
   },
-
   starsContainer: {
     flexDirection: 'row-reverse',
     justifyContent: 'space-between',
@@ -571,7 +613,6 @@ const styles = StyleSheet.create({
     marginTop: -2,
     fontWeight: 'bold',
   },
-
   miniActionBtn: {
     paddingVertical: 6,
     paddingHorizontal: 12,
@@ -585,7 +626,6 @@ const styles = StyleSheet.create({
     color: '#777',
     fontWeight: '600',
   },
-
   footerRow: {
     paddingHorizontal: 16,
     paddingBottom: 16,

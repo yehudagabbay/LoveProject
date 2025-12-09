@@ -137,14 +137,13 @@ const LiveBackground = () => {
         ]}
       />
 
-      {/* הוידאו עצמו */}
       <VideoView
         style={StyleSheet.absoluteFill}
         player={player}
-        contentFit="cover"              // כמו resizeMode="cover"
-        allowsFullscreen={false}
-        allowsPictureInPicture={false}
+        contentFit="cover"
+      // רקע בלבד – אין צורך בפול-סק्रीन או PIP
       />
+
 
       {/* שכבת כהה מעל הוידאו */}
       <View
@@ -329,7 +328,7 @@ export default function GameModeSelect({ navigation, route }) {
         {/* === END HEADER SECTION === */}
 
         <View style={styles.listContainer}>
-          
+
           {/* כרטיס 1: זוגי */}
           <ModeCard
             title="זוגי רומנטי"
@@ -453,7 +452,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   cardContainer: {
-    height: 88, 
+    height: 88,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.4,

@@ -3,7 +3,6 @@ import React, { useState } from 'react';
 import {
   View,
   StyleSheet,
-  Alert,
   ImageBackground,
   Dimensions,
   KeyboardAvoidingView,
@@ -14,8 +13,12 @@ import {
 import { TextInput, Button, Text } from 'react-native-paper';
 import * as SecureStore from 'expo-secure-store';
 
-// ✅ ייבוא הלוגו המונפש
-import AnimatedLogo from '../Settings/AnimatedLogo'; 
+// ✅ לוגו מונפש
+import AnimatedLogo from '../Settings/AnimatedLogo';
+
+// ✅ אותה התראה מעוצבת כמו בעמוד הרישום
+// (אותו נתיב כמו ב-Registration.jsx)
+import CustomAlert from '../../assets/utils/CustomAlert';
 
 const API_BASE = 'http://lovegame.somee.com/api';
 const { width } = Dimensions.get('window');
@@ -27,9 +30,35 @@ export default function Login({ route, navigation }) {
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  // --- התראה מעוצבת (כמו ברישום) ---
+  const [alertConfig, setAlertConfig] = useState({
+    visible: false,
+    type: 'success', // 'success' | 'error'
+    title: '',
+    message: '',
+    onOk: null,
+  });
+
+  const showAlert = (type, title, message, onOk = null) => {
+    setAlertConfig({
+      visible: true,
+      type,
+      title,
+      message,
+      onOk,
+    });
+  };
+
+  const handleAlertClose = () => {
+    const callback = alertConfig.onOk;
+    setAlertConfig(prev => ({ ...prev, visible: false }));
+    if (callback) callback();
+  };
+
+  // --- התחברות ---
   const handleLogin = async () => {
     if (!email.trim() || !password) {
-      Alert.alert('שגיאה', 'יש למלא אימייל וסיסמה.');
+      showAlert('error', 'שגיאה', 'יש למלא אימייל וסיסמה.');
       return;
     }
 
@@ -54,30 +83,38 @@ export default function Login({ route, navigation }) {
         const userId = String(user.UserID ?? user.userID ?? user.id ?? '');
 
         if (!userId) {
-          Alert.alert('שגיאה', 'לא התקבל מזהה משתמש מהשרת.');
+          showAlert('error', 'שגיאה', 'לא התקבל מזהה משתמש מהשרת.');
           return;
         }
 
         await SecureStore.setItemAsync('lg_userId', userId);
         await SecureStore.setItemAsync('lg_user', JSON.stringify(user));
 
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'GameModeSelect', params: { userId, user } }],
-        });
+        // ✅ התראת הצלחה מעוצבת + ניווט אחרי אישור
+        showAlert(
+          'success',
+          'התחברת בהצלחה!',
+          'מיד עוברים לבחירת סגנון המשחק...',
+          () => {
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'GameModeSelect', params: { userId, user } }],
+            });
+          }
+        );
 
         return;
       }
 
-      Alert.alert(
-        'שגיאה',
+      const msg =
         data?.message ||
-          data?.error ||
-          raw ||
-          `שגיאה בהתחברות (HTTP ${res.status})`
-      );
+        data?.error ||
+        raw ||
+        `שגיאה בהתחברות (HTTP ${res.status})`;
+
+      showAlert('error', 'שגיאה', msg);
     } catch (err) {
-      Alert.alert('תקלה ברשת', err?.message || String(err));
+      showAlert('error', 'תקלה ברשת', err?.message || String(err));
     } finally {
       setBusy(false);
     }
@@ -85,10 +122,19 @@ export default function Login({ route, navigation }) {
 
   return (
     <ImageBackground
-      source={require('../../assets/images/login_bg1.png')} 
+      source={require('../../assets/images/login_bg1.png')}
       style={styles.bg}
       resizeMode="cover"
     >
+      {/* ✅ התראה מעוצבת – בדיוק כמו ברישום */}
+      <CustomAlert
+        visible={alertConfig.visible}
+        type={alertConfig.type}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        onClose={handleAlertClose}
+      />
+
       <View style={styles.overlay} />
 
       <KeyboardAvoidingView
@@ -96,10 +142,8 @@ export default function Login({ route, navigation }) {
         style={{ flex: 1 }}
       >
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          
           <View style={styles.logoContainer}>
-             {/* הלוגו המונפש */}
-             <AnimatedLogo style={styles.logo} />
+            <AnimatedLogo style={styles.logo} />
           </View>
 
           <View style={styles.card}>
@@ -135,7 +179,7 @@ export default function Login({ route, navigation }) {
                 <TextInput.Icon
                   icon={showPassword ? 'eye-off' : 'eye'}
                   color="#888"
-                  onPress={() => setShowPassword(!showPassword)}
+                  onPress={() => setShowPassword(prev => !prev)}
                 />
               }
             />
@@ -155,11 +199,12 @@ export default function Login({ route, navigation }) {
 
           <View style={styles.footer}>
             <Text style={styles.footerText}>עדיין אין לכם משתמש?</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Registration')}>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Registration')}
+            >
               <Text style={styles.registerLink}>הירשמו עכשיו</Text>
             </TouchableOpacity>
           </View>
-
         </ScrollView>
       </KeyboardAvoidingView>
     </ImageBackground>
@@ -172,7 +217,7 @@ const styles = StyleSheet.create({
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(20, 10, 30, 0.4)', 
+    backgroundColor: 'rgba(20, 10, 30, 0.4)',
   },
   scrollContent: {
     flexGrow: 1,
@@ -184,12 +229,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 30,
   },
-  // ✅ שינוי גודל הלוגו כאן
   logo: {
-    width: 180,  // הוגדל מ-140
-    height: 180, // הוגדל מ-140
+    width: 180,
+    height: 180,
   },
-  
   card: {
     backgroundColor: 'rgba(255, 255, 255, 0.92)',
     borderRadius: 24,
@@ -233,7 +276,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     letterSpacing: 1,
   },
-
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',

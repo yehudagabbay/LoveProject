@@ -12,7 +12,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   Dimensions,
-  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -22,7 +21,6 @@ import {
   PanResponder,
   TextInput,
 } from 'react-native';
-// ❌ הוסר LogoutButton
 import logo1 from '../../assets/images/logo1.png';
 
 // אייקונים
@@ -33,7 +31,9 @@ import iconRelations from '../../assets/images/icons/relations.png';
 // ⏱ טיימר
 import { GameTimer } from '../Settings/GameTimer';
 
-// --- חישוב רוחב וגובה מסך ---
+// ✅ התראה מעוצבת – כמו ברישום/LOGIN
+import CustomAlert from '../Settings/CustomAlert';
+
 const W = Math.min(
   520,
   Math.max(320, Math.round(Dimensions.get('window').width - 40)),
@@ -80,7 +80,7 @@ const DECK_LAYERS = [
 export default function IndexGame({ route, navigation }) {
   const { cards = [], players: routePlayers = [] } = route?.params || {};
 
-  // שמות השחקנים – לזוגות יש ברירת מחדל אם לא הוזן
+  // שמות שחקנים לזוגות
   const players = useMemo(() => {
     if (
       Array.isArray(routePlayers) &&
@@ -91,7 +91,6 @@ export default function IndexGame({ route, navigation }) {
     return ['שחקן 1', 'שחקן 2'];
   }, [routePlayers]);
 
-  // תור השחקן הנוכחי
   const [currentPlayerIndex, setCurrentPlayerIndex] = useState(0);
 
   // --- אנימציות ---
@@ -129,7 +128,7 @@ export default function IndexGame({ route, navigation }) {
     ).start();
   }, [entryAnim, pulseAnim]);
 
-  // --- לוגיקה של קלפים --- //
+  // --- לוגיקת קלפים ---
   const mapById = useMemo(() => {
     const m = new Map();
     for (const c of cards) {
@@ -147,10 +146,35 @@ export default function IndexGame({ route, navigation }) {
   const [revealedCount, setRevealedCount] = useState(0);
   const [lastCombo, setLastCombo] = useState(null);
 
-  // משוב
+  // --- משוב ---
   const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
   const [sendingFeedback, setSendingFeedback] = useState(false);
+
+  // ✅ התראות מעוצבות (כמו LOGIN/Registration)
+  const [alertConfig, setAlertConfig] = useState({
+    visible: false,
+    type: 'success',
+    title: '',
+    message: '',
+    onOk: null,
+  });
+
+  const showAlert = (type, title, message, onOk = null) => {
+    setAlertConfig({
+      visible: true,
+      type,
+      title,
+      message,
+      onOk,
+    });
+  };
+
+  const handleAlertClose = () => {
+    const cb = alertConfig.onOk;
+    setAlertConfig((prev) => ({ ...prev, visible: false }));
+    if (cb) cb();
+  };
 
   const remainingCount = remaining.size;
   const totalCount = cards.length;
@@ -173,17 +197,12 @@ export default function IndexGame({ route, navigation }) {
 
   const handleDrawPress = () => {
     if (remainingCount === 0) {
-      Alert.alert(
+      // ❗ במקום Alert.alert – התראה מעוצבת
+      showAlert(
+        'error',
         'נגמרו הקלפים',
         'שיחקתם בכל הקלפים. חזרו למסך ההגדרות כדי להתחיל משחק חדש.',
-        [
-          {
-            text: 'להגדרות',
-            onPress: () =>
-              navigation.navigate('GameHome'),
-          },
-          { text: 'סגור', style: 'cancel' },
-        ],
+        () => navigation.navigate('GameHome')
       );
       return;
     }
@@ -242,7 +261,7 @@ export default function IndexGame({ route, navigation }) {
     if (!currentCardId) return;
     const userId = getCurrentUserId(route);
     if (!userId || userId <= 0) {
-      Alert.alert('שגיאה', 'לא נמצא משתמש מחובר לשליחת משוב.');
+      showAlert('error', 'שגיאה', 'לא נמצא משתמש מחובר לשליחת משוב.');
       return;
     }
     setFeedbackText('');
@@ -260,11 +279,11 @@ export default function IndexGame({ route, navigation }) {
     if (!card) return;
     const userId = getCurrentUserId(route);
     if (!userId || userId <= 0) {
-      Alert.alert('שגיאה', 'לא נמצא משתמש מחובר.');
+      showAlert('error', 'שגיאה', 'לא נמצא משתמש מחובר.');
       return;
     }
     if (!feedbackText.trim()) {
-      Alert.alert('משוב חסר', 'כתבו כמה מילים לפני שליחת המשוב.');
+      showAlert('error', 'משוב חסר', 'כתבו כמה מילים לפני שליחת המשוב.');
       return;
     }
 
@@ -283,10 +302,16 @@ export default function IndexGame({ route, navigation }) {
         body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error('Status not OK');
-      Alert.alert('תודה!', 'המשוב נשלח בהצלחה.');
-      closeFeedbackModal();
+
+      // ✅ תודה מעוצבת + סגירת מודאל משוב בלחיצה על אישור
+      showAlert(
+        'success',
+        'תודה!',
+        'המשוב נשלח בהצלחה.',
+        () => closeFeedbackModal()
+      );
     } catch (err) {
-      Alert.alert('שגיאה', 'לא ניתן היה לשלוח את המשוב כרגע.');
+      showAlert('error', 'שגיאה', 'לא ניתן היה לשלוח את המשוב כרגע.');
     } finally {
       setSendingFeedback(false);
     }
@@ -332,6 +357,15 @@ export default function IndexGame({ route, navigation }) {
 
   return (
     <View style={styles.screen}>
+      {/* ✅ התראה מעוצבת לכל העמוד */}
+      <CustomAlert
+        visible={alertConfig.visible}
+        type={alertConfig.type}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        onClose={handleAlertClose}
+      />
+
       {/* כותרת עליונה */}
       <View style={styles.header}>
         <Text style={styles.gameTitle}>משחק זוגות</Text>
@@ -463,7 +497,6 @@ export default function IndexGame({ route, navigation }) {
 
       {/* חצי תחתון */}
       <View style={styles.bottomHalf}>
-        {/* כפתורי שליפה / הגדרות */}
         <View style={styles.controlsBox}>
           <View style={styles.controlsRow}>
             <TouchableOpacity
@@ -493,7 +526,6 @@ export default function IndexGame({ route, navigation }) {
             כרטיסים שסיימתם: {revealedCount} / {totalCount}
           </Text>
 
-          {/* תור השחקן */}
           <View style={styles.playerTurnBadge}>
             <Text style={styles.playerTurnLabel}>עכשיו תור:</Text>
             <Text style={styles.playerTurnName}>
@@ -606,7 +638,6 @@ export default function IndexGame({ route, navigation }) {
                         </Text>
                       </ScrollView>
 
-                      {/* ⏱ טיימר – מתאפס לכל קלף חדש */}
                       <GameTimer
                         key={currentCardId}
                         mode="timer"
@@ -626,7 +657,6 @@ export default function IndexGame({ route, navigation }) {
                   </View>
                 </View>
 
-                {/* כפתורי פעולה */}
                 <View style={styles.modalActionsRow}>
                   <TouchableOpacity
                     style={[
@@ -745,10 +775,7 @@ export default function IndexGame({ route, navigation }) {
   );
 }
 
-// ==============================================
-// ================= עיצוב ======================
-// ==============================================
-
+// ====== styles (לא השתנו) ======
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
