@@ -1,10 +1,38 @@
 // App.js
 import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View, Text } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import * as SecureStore from 'expo-secure-store';
+
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.log('ErrorBoundary caught an error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Text>Something went wrong.</Text>
+          <Text>{this.state.error?.toString()}</Text>
+        </View>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 
 const Stack = createNativeStackNavigator();
@@ -32,14 +60,18 @@ export default function App() {
   const [initialRoute, setInitialRoute] = useState(null);
 
   useEffect(() => {
+    console.log('App useEffect running');
     (async () => {
       try {
         const raw = await SecureStore.getItemAsync('lg_user');
+        console.log('SecureStore result:', raw);
 
         // אם יש משתמש שמור → ישר לבחירת סגנון משחק
         // אם אין → מסך Welcome
         setInitialRoute(raw ? 'GameModeSelect' : 'Welcome');
-      } catch {
+        console.log('initialRoute set to:', raw ? 'GameModeSelect' : 'Welcome');
+      } catch (error) {
+        console.log('SecureStore error:', error);
         setInitialRoute('Welcome');
       }
     })();
@@ -48,26 +80,28 @@ export default function App() {
   if (!initialRoute) return null; // אפשר להחליף במסך Splash
 
   return (
-    <NavigationContainer>
-      <Stack.Navigator initialRouteName={initialRoute} screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Welcome" component={WelcomeScreen} />
-        <Stack.Screen name="GameModeSelect" component={GameModeSelect} />
-        <Stack.Screen name="Login" component={Login} />
-        <Stack.Screen name="Registration" component={Registration} />
-        <Stack.Screen name="SocialRegister" component={SocialRegister} />
-        <Stack.Screen name="IndexGame" component={IndexGame} />
-        <Stack.Screen name="GameHome" component={require('./comp/game/GameHome').default} />
-        <Stack.Screen name="Settings" component={Settings} options={{ title: 'הגדרות' }} />
-        <Stack.Screen name="FriendsCardsGame" component={FriendsCardsGame} />
-        <Stack.Screen name="FriendsCardsSelect" component={FriendsCardsSelect} />
-        <Stack.Screen name="FamilyCardsSelect" component={FamilyCardsSelect} />
-        <Stack.Screen name="FamilyCardsGame" component={FamilyCardsGame} />
-        <Stack.Screen name ="TopMenu" component={TopMenu} />
-        <Stack.Screen name ="FeedbackScreen" component={FeedbackScreen} />
-        <Stack.Screen name="Help" component={Help}/>
-      </Stack.Navigator>
-      <StatusBar style="auto" />
-    </NavigationContainer>
+    <ErrorBoundary>
+      <NavigationContainer>
+        <Stack.Navigator initialRouteName={initialRoute} screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="Welcome" component={WelcomeScreen} />
+          <Stack.Screen name="GameModeSelect" component={GameModeSelect} />
+          <Stack.Screen name="Login" component={Login} />
+          <Stack.Screen name="Registration" component={Registration} />
+          <Stack.Screen name="SocialRegister" component={SocialRegister} />
+          <Stack.Screen name="IndexGame" component={IndexGame} />
+          <Stack.Screen name="GameHome" component={GameHome} />
+          <Stack.Screen name="Settings" component={Settings} options={{ title: 'הגדרות' }} />
+          <Stack.Screen name="FriendsCardsGame" component={FriendsCardsGame} />
+          <Stack.Screen name="FriendsCardsSelect" component={FriendsCardsSelect} />
+          <Stack.Screen name="FamilyCardsSelect" component={FamilyCardsSelect} />
+          <Stack.Screen name="FamilyCardsGame" component={FamilyCardsGame} />
+          <Stack.Screen name ="TopMenu" component={TopMenu} />
+          <Stack.Screen name ="FeedbackScreen" component={FeedbackScreen} />
+          <Stack.Screen name="Help" component={Help}/>
+        </Stack.Navigator>
+        <StatusBar style="auto" />
+      </NavigationContainer>
+    </ErrorBoundary>
   );
 }
 

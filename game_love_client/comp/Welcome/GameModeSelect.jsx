@@ -13,7 +13,6 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
-import { useVideoPlayer, VideoView } from 'expo-video';
 
 import * as SecureStore from 'expo-secure-store';
 
@@ -112,47 +111,48 @@ const SloganAnimation = () => {
 };
 
 // ======================================================
-// רקע וידאו
+// רקע חלופי עם Gradient מונפש
 // ======================================================
-// ======================================================
-// רקע וידאו - עם expo-video
-// ======================================================
-const bgSource = require('../../assets/images/game_mode_select_bg2.mp4');
 
 const LiveBackground = () => {
-  const player = useVideoPlayer(bgSource, (playerInstance) => {
-    // הפעלה אוטומטית, לולאה ומיוט
-    playerInstance.loop = true;
-    playerInstance.muted = true;
-    playerInstance.play();
+  const animatedValue = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.timing(animatedValue, {
+        toValue: 1,
+        duration: 10000,
+        useNativeDriver: false,
+      })
+    ).start();
+  }, []);
+
+  const backgroundColor = animatedValue.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: ['#0f172a', '#1e293b', '#0f172a'],
   });
 
+  // Temporarily disabled video for production build
+  // const player = useVideoPlayer(bgSource, (playerInstance) => {
+  //   // הפעלה אוטומטית, לולאה ומיוט
+  //   playerInstance.loop = true;
+  //   playerInstance.muted = true;
+  //   playerInstance.play();
+  // });
+
   return (
-    <View style={StyleSheet.absoluteFill}>
-      {/* שכבת צבע בסיסית מתחת לוידאו */}
-      <View
-        style={[
-          StyleSheet.absoluteFill,
-          { backgroundColor: '#0f172a' },
-        ]}
-      />
-
-      <VideoView
+    <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor }]}>
+      <LinearGradient
+        colors={['#0f172a', '#1e293b', '#0f172a']}
         style={StyleSheet.absoluteFill}
-        player={player}
-        contentFit="cover"
-      // רקע בלבד – אין צורך בפול-סק्रीन או PIP
       />
-
-
-      {/* שכבת כהה מעל הוידאו */}
       <View
         style={[
           StyleSheet.absoluteFill,
           { backgroundColor: 'rgba(15, 23, 42, 0.45)' },
         ]}
       />
-    </View>
+    </Animated.View>
   );
 };
 

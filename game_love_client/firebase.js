@@ -1,17 +1,15 @@
-// game_love_client/firebase.js
-import { initializeApp } from 'firebase/app';
-import { initializeAuth, getReactNativePersistence } from 'firebase/auth';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { initializeApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
 
-// הכנס את הערכים מה-Firebase Console שלך:
 const firebaseConfig = {
-  apiKey: "AIzaSyCZVTEhlKis9PZPE-UcuFqDU2xrxsVhSOc",
-  authDomain: "lovegame-d5319.firebaseapp.com",
-   projectId: "lovegame-d5319",
-    appId: "1:302885477032:web:d3bb3cb23bf59d2d32409d",
+  apiKey: "AIzaSyAzPpTKNvRPE64y_1CKj9TVzxJCNf2FGXY",
+  authDomain: "liba-game.firebaseapp.com",
+  projectId: "liba-game",
+  storageBucket: "liba-game.firebasestorage.app",
+  messagingSenderId: "726714686390",
+  appId: "1:726714686390:web:efd4d7cc4e2a0d9e07ff17",
+  measurementId: "G-6SP1KVD780"
 };
-
-export const app = initializeApp(firebaseConfig);
-export const auth = initializeAuth(app, {
-  persistence: getReactNativePersistence(AsyncStorage),
-});
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+export { app, auth };

@@ -8,7 +8,6 @@ import {
   Dimensions, 
   Animated 
 } from 'react-native';
-import { useVideoPlayer, VideoView } from 'expo-video';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -18,32 +17,33 @@ import AnimatedLogo from '../Settings/AnimatedLogo';
 
 const { width } = Dimensions.get('window');
 
-// --- רכיב רקע וידאו ---
-// --- רכיב רקע וידאו עם expo-video ---
-const bgSource = require('../../assets/images/game_mode_select_bg3.mp4');
+// --- רכיב רקע חלופי עם Gradient מונפש ---
 
 const LiveBackground = () => {
-  const player = useVideoPlayer(bgSource, (playerInstance) => {
-    playerInstance.loop = true;   // לולאה
-    playerInstance.muted = true;  // מיוט
-    playerInstance.play();        // הפעלה אוטומטית
+  const animatedValue = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.timing(animatedValue, {
+        toValue: 1,
+        duration: 10000, // 10 שניות ללולאה
+        useNativeDriver: false, // כי אנחנו משנים צבעים
+      })
+    ).start();
+  }, []);
+
+  const backgroundColor = animatedValue.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: ['#0b1020', '#1a1a2e', '#0b1020'], // צבעים כהים משתנים
   });
 
   return (
-    <View style={StyleSheet.absoluteFill}>
-      <VideoView
+    <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor }]}>
+      <LinearGradient
+        colors={['rgba(11, 16, 32, 0.8)', 'rgba(26, 26, 46, 0.8)', 'rgba(11, 16, 32, 0.8)']}
         style={StyleSheet.absoluteFill}
-        player={player}
-        contentFit="cover" // כמו resizeMode="cover"
       />
-      {/* שכבת כהות כדי שהטקסט יהיה קריא וברור */}
-      <View
-        style={[
-          StyleSheet.absoluteFill,
-          { backgroundColor: 'rgba(11, 16, 32, 0.75)' },
-        ]}
-      />
-    </View>
+    </Animated.View>
   );
 };
 
