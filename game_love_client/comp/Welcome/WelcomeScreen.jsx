@@ -73,12 +73,10 @@ export default function WelcomeScreen({ navigation }) {
     <View style={styles.container}>
       <StatusBar style="light" />
       
-      {/* רקע חי */}
       <LiveBackground />
 
       <View style={styles.contentContainer}>
         
-        {/* --- חלק עליון: לוגו + LIBA + סלוגן במרכז המסך --- */}
         <View style={styles.headerSection}>
           <View style={styles.logoWrapper}>
             <AnimatedLogo style={styles.logo} />
@@ -88,7 +86,6 @@ export default function WelcomeScreen({ navigation }) {
           <Text style={styles.tagline}>להכיר. להתחבר. לאהוב.</Text>
         </View>
 
-        {/* --- חלק תחתון: שני הכפתורים --- */}
         <Animated.View 
           style={[
             styles.buttonsContainer, 
@@ -99,7 +96,6 @@ export default function WelcomeScreen({ navigation }) {
 
           <View style={styles.cardsRow}>
             
-            {/* כפתור ימני: משתמש קיים (התחברות) */}
             <TouchableOpacity
               activeOpacity={0.8}
               style={styles.cardWrapper}
@@ -117,7 +113,6 @@ export default function WelcomeScreen({ navigation }) {
               </LinearGradient>
             </TouchableOpacity>
 
-            {/* כפתור שמאלי: משתמש חדש (הרשמה) */}
             <TouchableOpacity
               activeOpacity={0.8}
               style={styles.cardWrapper}
@@ -149,7 +144,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#0b1020',
   },
 
-  // במקום space-between: נותנים ל-header flex:1 כדי למרכז אותו אנכית
   contentContainer: {
     flex: 1,
     paddingHorizontal: 20,
@@ -157,11 +151,10 @@ const styles = StyleSheet.create({
     paddingTop: 40,
   },
   
-  // --- חלק עליון: לוגו + שם + סלוגן במרכז המסך ---
   headerSection: {
-    flex: 1,                  // 👈 זה נותן לחלק העליון "תפיסת גובה"
+    flex: 1,                 
     alignItems: 'center',
-    justifyContent: 'center', // 👈 מרכז את הלוגו + LIBA + סלוגן אנכית
+    justifyContent: 'center',
   },
   logoWrapper: {
     shadowColor: '#ffffff',
@@ -192,10 +185,9 @@ const styles = StyleSheet.create({
     opacity: 0.9,
   },
   
-  // --- חלק תחתון: כפתורים ---
   buttonsContainer: {
     width: '100%',
-    marginBottom: 10, // קצת מרווח מהקצה התחתון
+    marginBottom: 10,    
   },
   chooseText: {
     color: '#94a3b8',
@@ -205,7 +197,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   cardsRow: {
-    flexDirection: 'row-reverse', // "התחברות" מימין
+    flexDirection: 'row-reverse', 
     justifyContent: 'space-between',
   },
   cardWrapper: {

@@ -1,7 +1,7 @@
 // App.js
 import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, View, Text } from 'react-native';
+import { StyleSheet, View, Text, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import * as SecureStore from 'expo-secure-store';
@@ -61,6 +61,14 @@ export default function App() {
 
   useEffect(() => {
     console.log('App useEffect running');
+    let mounted = true;
+    const timeoutId = setTimeout(() => {
+      if (mounted) {
+        console.log('SecureStore timeout, falling back to Welcome');
+        setInitialRoute('Welcome');
+      }
+    }, 5000);
+
     (async () => {
       try {
         const raw = await SecureStore.getItemAsync('lg_user');
@@ -68,16 +76,33 @@ export default function App() {
 
         // אם יש משתמש שמור → ישר לבחירת סגנון משחק
         // אם אין → מסך Welcome
-        setInitialRoute(raw ? 'GameModeSelect' : 'Welcome');
-        console.log('initialRoute set to:', raw ? 'GameModeSelect' : 'Welcome');
+        if (mounted) {
+          setInitialRoute(raw ? 'GameModeSelect' : 'Welcome');
+          console.log('initialRoute set to:', raw ? 'GameModeSelect' : 'Welcome');
+        }
       } catch (error) {
         console.log('SecureStore error:', error);
-        setInitialRoute('Welcome');
+        if (mounted) {
+          setInitialRoute('Welcome');
+        }
+      } finally {
+        clearTimeout(timeoutId);
       }
     })();
+
+    return () => {
+      mounted = false;
+      clearTimeout(timeoutId);
+    };
   }, []);
 
-  if (!initialRoute) return null; // אפשר להחליף במסך Splash
+  if (!initialRoute) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
 
   return (
     <ErrorBoundary>
@@ -107,4 +132,5 @@ export default function App() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  loadingContainer: { flex: 1, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
 });

@@ -13,25 +13,19 @@ import { auth } from '../../firebase';
 
 WebBrowser.maybeCompleteAuthSession();
 
-// ✅ Expo Go / Web (אצלך יכול להיות אותו ID)
 const EXPO_CLIENT_ID =
   '726714686390-df2iqb16cka5pccs3qspk1ermi6occ75.apps.googleusercontent.com';
 
 const WEB_CLIENT_ID =
   '726714686390-df2iqb16cka5pccs3qspk1ermi6occ75.apps.googleusercontent.com';
 
-// ✅ Android OAuth Client ID שיצרת (חובה ל-native)
 const ANDROID_CLIENT_ID =
   '726714686390-ih3ov2p8o8kfjmfr3sn65p945t7nc0pg.apps.googleusercontent.com';
 
 export default function SocialRegister({ navigation, route }) {
   const [loading, setLoading] = useState(true);
 
-  // ✅ חייב להיות זהה ל-app.json -> expo.scheme
-  // אצלך: "scheme": "loveclient"
-  const redirectUri = makeRedirectUri({ scheme: 'loveclient',
-    native: 'com.liba.game:/oauth2redirect',
-   });
+  const redirectUri = makeRedirectUri({ scheme: 'loveclient' });
   console.log("REDIRECT URI:", redirectUri);
 
   const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
@@ -42,23 +36,18 @@ export default function SocialRegister({ navigation, route }) {
     useProxy: false, 
   });
 
-  // ✅ כדי שלא יפתח 2 פעמים
   const openedOnceRef = useRef(false);
 
-  // ✅ פתיחה אוטומטית של חלון Google כשנכנסים למסך
   useEffect(() => {
     const provider = route?.params?.provider;
 
-    // אם הגיעו בלי provider=Google, אין מה לעשות פה
     if (provider !== 'Google') {
       setLoading(false);
       return;
     }
 
-    // מחכים ש-request יהיה מוכן
     if (!request) return;
 
-    // פותחים פעם אחת בלבד
     if (openedOnceRef.current) return;
     openedOnceRef.current = true;
 
@@ -73,11 +62,9 @@ export default function SocialRegister({ navigation, route }) {
     })();
   }, [request, route?.params?.provider, promptAsync, navigation]);
 
-  // ✅ טיפול בתשובת גוגל
   useEffect(() => {
     if (!response) return;
 
-    // המשתמש ביטל
     if (response.type === 'dismiss' || response.type === 'cancel') {
       Alert.alert('בוטל', 'התחברות Google בוטלה');
       navigation.goBack();
@@ -98,7 +85,6 @@ export default function SocialRegister({ navigation, route }) {
       try {
         setLoading(true);
 
-        // 1) Firebase Sign-in
         const credential = GoogleAuthProvider.credential(idToken);
         const userCred = await signInWithCredential(auth, credential);
 
