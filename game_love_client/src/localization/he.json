@@ -1,0 +1,47 @@
+{
+  "alerts": {
+    "successTitle": "הצלחה",
+    "errorTitle": "שגיאה",
+    "networkErrorTitle": "תקלה ברשת"
+  },
+  "general": {
+    "sending": "שולח..."
+  },
+  "registration": {
+    "title": "רישום",
+    "fields": {
+      "nickname": "כינוי",
+      "genderLabel": "מין:",
+      "email": "אימייל",
+      "password": "סיסמה",
+      "confirmPassword": "חזור על הסיסמה",
+      "age": "גיל"
+    },
+    "gender": {
+      "male": "זכר",
+      "female": "נקבה"
+    },
+    "buttons": {
+      "register": "הירשם",
+      "registerWithGoogle": "הירשם עם Google",
+      "registerWithFacebook": "הירשם עם Facebook"
+    },
+    "links": {
+      "haveAccount": "כבר יש לך חשבון? התחבר כאן"
+    },
+    "alerts": {
+      "registerSuccess": "נרשמת בהצלחה!",
+      "registerHttpError": "שגיאה ברישום (HTTP {{status}})"
+    },
+    "errors": {
+      "nicknameRequired": "יש להזין כינוי",
+      "genderRequired": "יש לבחור מין",
+      "emailRequired": "יש להזין אימייל",
+      "emailInvalid": "אימייל לא תקין",
+      "passwordRequired": "יש להזין סיסמה",
+      "passwordWeak": "סיסמה צריכה להכיל לפחות 6 תווים, אות ומספר",
+      "passwordsNotMatch": "הסיסמאות לא תואמות",
+      "ageInvalid": "יש להזין גיל חוקי"
+    }
+  }
+}

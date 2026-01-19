@@ -1,0 +1,47 @@
+{
+  "alerts": {
+    "successTitle": "Success",
+    "errorTitle": "Error",
+    "networkErrorTitle": "Network error"
+  },
+  "general": {
+    "sending": "Sending..."
+  },
+  "registration": {
+    "title": "Register",
+    "fields": {
+      "nickname": "Nickname",
+      "genderLabel": "Gender:",
+      "email": "Email",
+      "password": "Password",
+      "confirmPassword": "Confirm password",
+      "age": "Age"
+    },
+    "gender": {
+      "male": "Male",
+      "female": "Female"
+    },
+    "buttons": {
+      "register": "Register",
+      "registerWithGoogle": "Register with Google",
+      "registerWithFacebook": "Register with Facebook"
+    },
+    "links": {
+      "haveAccount": "Already have an account? Login here"
+    },
+    "alerts": {
+      "registerSuccess": "Registered successfully!",
+      "registerHttpError": "Registration error (HTTP {{status}})"
+    },
+    "errors": {
+      "nicknameRequired": "Please enter a nickname",
+      "genderRequired": "Please select a gender",
+      "emailRequired": "Please enter an email",
+      "emailInvalid": "Invalid email",
+      "passwordRequired": "Please enter a password",
+      "passwordWeak": "Password must be at least 6 characters and include a letter and a number",
+      "passwordsNotMatch": "Passwords do not match",
+      "ageInvalid": "Please enter a valid age"
+    }
+  }
+}

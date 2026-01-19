@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+// comp/Registration/registration.jsx
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,16 +10,31 @@ import {
   ScrollView,
   ActivityIndicator,
   KeyboardAvoidingView,
-  Platform
+  Platform,
+  StatusBar
 } from 'react-native';
 import { TextInput, Button } from 'react-native-paper';
+
+// ✅ בורר שפה (שמאל למעלה)
+import LanguageSwitcher from '../../src/localization/components/LanguageSwitcher';
+import { useLanguage } from '../../src/localization/LanguageContext';
+import i18n from '../../src/localization/i18n';
 
 // --- כאן אנחנו מייבאים את ההתראה המעוצבת ---
 import CustomAlert from '../../assets/utils/CustomAlert';
 
 const API_BASE = 'http://loveGame.somee.com/api';
+const GENDER_MALE = 'זכר';
+const GENDER_FEMALE = 'נקבה';
 
 const Registration = ({ navigation }) => {
+  const { lang } = useLanguage();
+
+  // ✅ t מקבל תמיד את השפה הנוכחית
+  const t = useMemo(() => {
+    return (key, options) => i18n.t(key, { ...options, locale: lang });
+  }, [lang]);
+
   // שדות הטופס
   const [nickname, setNickname] = useState('');
   const [gender, setGender] = useState('');
@@ -27,17 +43,17 @@ const Registration = ({ navigation }) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [age, setAge] = useState('');
 
-  // סטייט לשגיאות + טעינה
-  const [errors, setErrors] = useState({});
+  // ✅ במקום לשמור טקסט שגיאה – שומרים "מפתחות" (keys)
+  const [errorKeys, setErrorKeys] = useState({});
   const [busy, setBusy] = useState(false);
 
   // --- סטייט לניהול ההתראה המעוצבת ---
   const [alertConfig, setAlertConfig] = useState({
     visible: false,
-    type: 'success', // 'success' או 'error'
+    type: 'success',
     title: '',
     message: '',
-    onOk: null // פונקציה שתרוץ כשלוחצים אישור (למשל ניווט)
+    onOk: null
   });
 
   // רפרנס לגלילה
@@ -73,44 +89,46 @@ const Registration = ({ navigation }) => {
     setAlertConfig({ visible: true, type, title, message, onOk });
   };
 
-  // בתוך Registration.jsx
-
   const handleAlertClose = () => {
     const callback = alertConfig.onOk;
-
-    // קודם מאפסים את ה-visible כדי שהרכיב יפסיק להיות מרונדר
     setAlertConfig(prev => ({ ...prev, visible: false }));
-
-    // אם הוגדרה פעולה (כמו ניווט), מפעילים אותה עכשיו
     if (callback) callback();
   };
 
-  const validate = (field, value) => {
+  // ✅ מחזיר מפתחות לשגיאות (לא טקסט)
+  const buildErrorKeys = (m) => {
+    const e = {};
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d).{6,}$/;
-    const model = { nickname, gender, email, password, confirmPassword, age, ...(field ? { [field]: value } : {}) };
 
-    const buildErrors = (m) => {
-      const e = {};
-      if (!m.nickname?.trim()) e.nickname = 'יש להזין כינוי';
-      if (!m.gender) e.gender = 'יש לבחור מין';
-      if (!m.email?.trim()) e.email = 'יש להזין אימייל';
-      else if (!emailRegex.test(m.email)) e.email = 'אימייל לא תקין';
-      if (!m.password) e.password = 'יש להזין סיסמה';
-      else if (!passwordRegex.test(m.password)) e.password = 'סיסמה צריכה להכיל לפחות 6 תווים, אות ומספר';
-      if (m.confirmPassword !== m.password) e.confirmPassword = 'הסיסמאות לא תואמות';
-      const n = Number(m.age);
-      if (!m.age || Number.isNaN(n) || n <= 0) e.age = 'יש להזין גיל חוקי';
-      return e;
-    };
+    if (!m.nickname?.trim()) e.nickname = 'registration.errors.nicknameRequired';
+    if (!m.gender) e.gender = 'registration.errors.genderRequired';
+
+    if (!m.email?.trim()) e.email = 'registration.errors.emailRequired';
+    else if (!emailRegex.test(m.email)) e.email = 'registration.errors.emailInvalid';
+
+    if (!m.password) e.password = 'registration.errors.passwordRequired';
+    else if (!passwordRegex.test(m.password)) e.password = 'registration.errors.passwordWeak';
+
+    if (m.confirmPassword !== m.password) e.confirmPassword = 'registration.errors.passwordsNotMatch';
+
+    const n = Number(m.age);
+    if (!m.age || Number.isNaN(n) || n <= 0) e.age = 'registration.errors.ageInvalid';
+
+    return e;
+  };
+
+  const validate = (field, value) => {
+    const model = { nickname, gender, email, password, confirmPassword, age, ...(field ? { [field]: value } : {}) };
+    const e = buildErrorKeys(model);
 
     if (field) {
-      setErrors(buildErrors(model));
+      setErrorKeys(e);
       return;
     }
-    const allErrors = buildErrors(model);
-    setErrors(allErrors);
-    return Object.keys(allErrors).length === 0;
+
+    setErrorKeys(e);
+    return Object.keys(e).length === 0;
   };
 
   const registerUser = async () => {
@@ -119,7 +137,7 @@ const Registration = ({ navigation }) => {
     try {
       const payload = {
         nickname: nickname.trim(),
-        gender,
+        gender, // נשאר כמו אצלך (ערכים בעברית) - ניגע בזה אחר כך אם תרצה
         email: email.trim(),
         passwordHash: password,
         age: Number(age),
@@ -136,14 +154,13 @@ const Registration = ({ navigation }) => {
       try {
         raw = await res.text();
         data = raw ? JSON.parse(raw) : null;
-      } catch { }
+      } catch {}
 
       if (res.ok) {
-        // --- הצלחה: הצגת מודל ירוק וניווט בלחיצה על אישור ---
         showAlert(
           'success',
-          'הצלחה',
-          data?.message || 'נרשמת בהצלחה!',
+          t('alerts.successTitle'),
+          data?.message || t('registration.alerts.registerSuccess'),
           () => {
             navigation.reset({
               index: 0,
@@ -154,12 +171,15 @@ const Registration = ({ navigation }) => {
         return;
       }
 
-      const errMsg = data?.message || data?.error || raw || `שגיאה ברישום (HTTP ${res.status})`;
-      // --- שגיאה: הצגת מודל אדום ---
-      showAlert('error', 'שגיאה', errMsg);
+      const errMsg =
+        data?.message ||
+        data?.error ||
+        raw ||
+        t('registration.alerts.registerHttpError', { status: res.status });
 
+      showAlert('error', t('alerts.errorTitle'), errMsg);
     } catch (err) {
-      showAlert('error', 'תקלה ברשת', err?.message || String(err));
+      showAlert('error', t('alerts.networkErrorTitle'), err?.message || String(err));
     } finally {
       setBusy(false);
     }
@@ -170,7 +190,11 @@ const Registration = ({ navigation }) => {
       source={require('../../assets/images/reg_page_bg.jpg')}
       style={styles.background}
     >
-      {/* הרכיב של ההתראה מוטמע כאן למעלה */}
+      {/* ✅ בורר שפה בפינה שמאלית־עליונה */}
+      <View style={styles.langWrap}>
+        <LanguageSwitcher />
+      </View>
+
       <CustomAlert
         visible={alertConfig.visible}
         type={alertConfig.type}
@@ -180,7 +204,7 @@ const Registration = ({ navigation }) => {
       />
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
       >
         <ScrollView
@@ -188,89 +212,90 @@ const Registration = ({ navigation }) => {
           contentContainerStyle={styles.scrollContainer}
           keyboardShouldPersistTaps="handled"
         >
-          <Text style={styles.title}>רישום</Text>
+          <Text style={styles.title}>{t('registration.title')}</Text>
 
           <TextInput
-            label="כינוי"
+            label={t('registration.fields.nickname')}
             mode="outlined"
             dense
             value={nickname}
             onChangeText={(text) => { setNickname(text); validate('nickname', text); }}
-            error={!!errors.nickname}
+            error={!!errorKeys.nickname}
             style={styles.input}
           />
-          {errors.nickname && <Text style={styles.errorText}>{errors.nickname}</Text>}
+          {errorKeys.nickname && <Text style={styles.errorText}>{t(errorKeys.nickname)}</Text>}
 
-          <Text style={styles.label}>מין:</Text>
-          {errors.gender ? <Text style={[styles.errorText, { alignSelf: 'flex-start' }]}>{errors.gender}</Text> : null}
+          <Text style={styles.label}>{t('registration.fields.genderLabel')}</Text>
+          {errorKeys.gender ? <Text style={[styles.errorText, { alignSelf: 'flex-start' }]}>{t(errorKeys.gender)}</Text> : null}
+
           <View style={styles.genderContainer}>
             <TouchableOpacity
-              onPress={() => { setGender('זכר'); validate('gender', 'זכר'); }}
-              style={[styles.genderButton, gender === 'זכר' && styles.genderButtonSelected]}
+              onPress={() => { setGender(GENDER_MALE); validate('gender', GENDER_MALE); }}
+              style={[styles.genderButton, gender === GENDER_MALE && styles.genderButtonSelected]}
             >
               <Text style={styles.genderEmoji}>👦🏻</Text>
-              <Text style={styles.genderText}>זכר</Text>
+              <Text style={styles.genderText}>{t('registration.gender.male')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => { setGender('נקבה'); validate('gender', 'נקבה'); }}
-              style={[styles.genderButton, gender === 'נקבה' && styles.genderButtonSelected]}
+              onPress={() => { setGender(GENDER_FEMALE); validate('gender', GENDER_FEMALE); }}
+              style={[styles.genderButton, gender === GENDER_FEMALE && styles.genderButtonSelected]}
             >
               <Text style={styles.genderEmoji}>👧🏻</Text>
-              <Text style={styles.genderText}>נקבה</Text>
+              <Text style={styles.genderText}>{t('registration.gender.female')}</Text>
             </TouchableOpacity>
           </View>
 
           <Animated.View style={{ overflow: 'hidden', height: animatedHeight }}>
             <View style={styles.expandedBlock}>
               <TextInput
-                label="אימייל"
+                label={t('registration.fields.email')}
                 mode="outlined"
                 dense
                 keyboardType="email-address"
                 autoCapitalize="none"
                 value={email}
                 onChangeText={(text) => { setEmail(text); validate('email', text); }}
-                error={!!errors.email}
+                error={!!errorKeys.email}
                 style={styles.input}
               />
-              {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
+              {errorKeys.email && <Text style={styles.errorText}>{t(errorKeys.email)}</Text>}
 
               <TextInput
-                label="סיסמה"
+                label={t('registration.fields.password')}
                 mode="outlined"
                 dense
                 secureTextEntry
                 value={password}
                 onChangeText={(text) => { setPassword(text); validate('password', text); }}
-                error={!!errors.password}
+                error={!!errorKeys.password}
                 style={styles.input}
               />
-              {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
+              {errorKeys.password && <Text style={styles.errorText}>{t(errorKeys.password)}</Text>}
 
               <TextInput
-                label="חזור על הסיסמה"
+                label={t('registration.fields.confirmPassword')}
                 mode="outlined"
                 dense
                 secureTextEntry
                 value={confirmPassword}
                 onChangeText={(text) => { setConfirmPassword(text); validate('confirmPassword', text); }}
-                error={!!errors.confirmPassword}
+                error={!!errorKeys.confirmPassword}
                 style={styles.input}
               />
-              {errors.confirmPassword && <Text style={styles.errorText}>{errors.confirmPassword}</Text>}
+              {errorKeys.confirmPassword && <Text style={styles.errorText}>{t(errorKeys.confirmPassword)}</Text>}
 
               <TextInput
-                label="גיל"
+                label={t('registration.fields.age')}
                 mode="outlined"
                 dense
                 keyboardType="numeric"
                 value={age}
                 onChangeText={(text) => { setAge(text); validate('age', text); }}
-                error={!!errors.age}
+                error={!!errorKeys.age}
                 style={styles.input}
               />
-              {errors.age && <Text style={styles.errorText}>{errors.age}</Text>}
+              {errorKeys.age && <Text style={styles.errorText}>{t(errorKeys.age)}</Text>}
 
               <Button
                 mode="contained"
@@ -281,7 +306,7 @@ const Registration = ({ navigation }) => {
                 textColor="white"
                 style={[styles.heartButton, { width: 300 }]}
               >
-                {busy ? 'שולח...' : ' הירשם '}
+                {busy ? t('general.sending') : t('registration.buttons.register')}
               </Button>
 
               {busy ? <View style={{ marginTop: 10 }}><ActivityIndicator /></View> : null}
@@ -296,8 +321,9 @@ const Registration = ({ navigation }) => {
               onPress={() => navigation.navigate('SocialRegister', { provider: 'Google' })}
               style={styles.socialButton}
             >
-              הירשם עם Google
+              {t('registration.buttons.registerWithGoogle')}
             </Button>
+
             <Button
               mode="outlined"
               icon="facebook"
@@ -305,12 +331,12 @@ const Registration = ({ navigation }) => {
               onPress={() => navigation.navigate('SocialRegister', { provider: 'Facebook' })}
               style={styles.socialButton}
             >
-              הירשם עם Facebook
+              {t('registration.buttons.registerWithFacebook')}
             </Button>
           </Animated.View>
 
           <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-            <Text style={styles.linkText}>כבר יש לך חשבון? התחבר כאן</Text>
+            <Text style={styles.linkText}>{t('registration.links.haveAccount')}</Text>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -320,6 +346,15 @@ const Registration = ({ navigation }) => {
 
 const styles = StyleSheet.create({
   background: { flex: 1, resizeMode: 'cover' },
+
+  // ✅ בורר שפה – ירד קצת מתחת לסטטוס בר
+  langWrap: {
+    position: 'absolute',
+    top: (StatusBar.currentHeight || 0) + 14,
+    left: 12,
+    zIndex: 9999,
+  },
+
   scrollContainer: { padding: 20, alignItems: 'center', paddingBottom: 100 },
   title: { fontSize: 32, fontWeight: 'bold', color: '#fff', marginBottom: 20 },
   input: { width: 300, backgroundColor: 'rgba(255,255,255,0.7)', borderRadius: 8, marginBottom: 10 },
